@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { VStack, HStack } from "@astryxdesign/core/Layout"
 import { Heading, Text } from "@astryxdesign/core/Text"
 import { Card } from "@astryxdesign/core/Card"
@@ -23,7 +23,7 @@ import {
   Users,
 } from "lucide-react"
 import { useMail } from "@/components/mail-context"
-import type { PostarcContact } from "@/lib/postarc-api"
+import { postarcApi, type PostarcContact } from "@/lib/postarc-api"
 
 interface ContactRow extends PostarcContact, Record<string, unknown> {}
 
@@ -32,6 +32,10 @@ export default function ContactsAddressBookPage() {
   const [contactList, setContactList] = useState<ContactRow[]>(contacts as ContactRow[])
   const [selectedGroup, setSelectedGroup] = useState<string>("All")
   const [searchQuery, setSearchQuery] = useState("")
+
+  useEffect(() => {
+    setContactList(contacts as ContactRow[])
+  }, [contacts])
 
   // Add Contact Dialog
   const [isAddOpen, setIsAddOpen] = useState(false)
@@ -55,30 +59,48 @@ export default function ContactsAddressBookPage() {
     )
   })
 
-  const handleAddContact = () => {
+  const handleAddContact = async () => {
     if (!name.trim() || !email.trim()) return
 
-    const newContact: ContactRow = {
-      id: `cnt_${Date.now()}`,
-      name: name.trim(),
-      email: email.trim(),
-      phone: phone.trim() || undefined,
-      company: company.trim() || undefined,
-      jobTitle: jobTitle.trim() || undefined,
-      group,
-    }
+    try {
+      const serverId = await postarcApi.createContact({
+        name: name.trim(),
+        email: email.trim(),
+        phone: phone.trim() || undefined,
+        company: company.trim() || undefined,
+        jobTitle: jobTitle.trim() || undefined,
+        group,
+      })
 
-    setContactList((prev) => [newContact, ...prev])
-    setIsAddOpen(false)
-    setName("")
-    setEmail("")
-    setPhone("")
-    setCompany("")
-    setJobTitle("")
+      const newContact: ContactRow = {
+        id: serverId,
+        name: name.trim(),
+        email: email.trim(),
+        phone: phone.trim() || undefined,
+        company: company.trim() || undefined,
+        jobTitle: jobTitle.trim() || undefined,
+        group,
+      }
+
+      setContactList((prev) => [newContact, ...prev])
+      setIsAddOpen(false)
+      setName("")
+      setEmail("")
+      setPhone("")
+      setCompany("")
+      setJobTitle("")
+    } catch (err: any) {
+      console.error("Failed to persist contact:", err)
+    }
   }
 
-  const handleDeleteContact = (id: string) => {
-    setContactList((prev) => prev.filter((c) => c.id !== id))
+  const handleDeleteContact = async (id: string) => {
+    try {
+      await postarcApi.deleteContact(id)
+      setContactList((prev) => prev.filter((c) => c.id !== id))
+    } catch (err: any) {
+      console.error("Failed to delete contact:", err)
+    }
   }
 
   const exportVCard = (contact: ContactRow) => {

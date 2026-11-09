@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { VStack, HStack } from "@astryxdesign/core/Layout"
 import { Heading, Text } from "@astryxdesign/core/Text"
 import { Card } from "@astryxdesign/core/Card"
@@ -8,28 +8,36 @@ import { NumberInput } from "@astryxdesign/core/NumberInput"
 import { ProgressBar } from "@astryxdesign/core/ProgressBar"
 import { Table, type TableColumn, pixel, proportional } from "@astryxdesign/core/Table"
 import { Avatar } from "@astryxdesign/core/Avatar"
-import { mockCompanyUsers } from "@/lib/mock-data"
 import type { MailboxUser } from "@/types/mailbox"
 import { AdminPageLayout } from "@/components/admin-page-layout"
+import { postarcApi } from "@/lib/postarc-api"
 
 interface StorageRow extends MailboxUser, Record<string, unknown> {}
 
 export default function AdminStoragePoolPage() {
-  const [users, setUsers] = useState<StorageRow[]>(mockCompanyUsers as StorageRow[])
+  const [users, setUsers] = useState<StorageRow[]>([])
 
-  const handleSetQuota = (userId: string, newGB: number) => {
+  useEffect(() => {
+    postarcApi.getUsers().then((u) => {
+      if (u) setUsers(u as StorageRow[])
+    }).catch(console.error)
+  }, [])
+
+  const handleSetQuota = async (userId: string, newGB: number) => {
     if (!newGB || newGB < 1) return
+    const newBytes = newGB * 1024 * 1024 * 1024
     setUsers((prev) =>
       prev.map((u) => {
         if (u.id === userId) {
           return {
             ...u,
-            storageTotalBytes: newGB * 1024 * 1024 * 1024,
+            storageTotalBytes: newBytes,
           }
         }
         return u
       })
     )
+    await postarcApi.updateUser(userId, { storageTotalBytes: newBytes }).catch(console.error)
   }
 
   const columns: TableColumn<StorageRow>[] = [

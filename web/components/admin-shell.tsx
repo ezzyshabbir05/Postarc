@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { usePathname } from "next/navigation"
 import { AppShell } from "@astryxdesign/core/AppShell"
 import { TopNav, TopNavHeading } from "@astryxdesign/core/TopNav"
@@ -23,18 +23,29 @@ import {
   Plus,
 } from "lucide-react"
 import type { MailboxUser } from "@/types/mailbox"
-import { getStoragePoolSummary, mockCompanyUsers } from "@/lib/mock-data"
+import { postarcApi } from "@/lib/postarc-api"
 import { useThemeMode } from "@/components/theme-provider"
 
 // ─── Admin Top Navigation ────────────────────────────────────────────────────
 
 interface AdminTopNavProps {
-  admin: MailboxUser
+  admin?: MailboxUser | null
 }
 
-function AdminTopNav({ admin }: AdminTopNavProps) {
+function AdminTopNav({ admin: initialAdmin }: AdminTopNavProps) {
   const [searchQuery, setSearchQuery] = useState("")
+  const [adminUser, setAdminUser] = useState<MailboxUser | null>(initialAdmin || null)
   const { mode, toggleTheme } = useThemeMode()
+
+  useEffect(() => {
+    if (!adminUser) {
+      const current = postarcApi.getCurrentUser()
+      if (current) setAdminUser(current)
+    }
+  }, [adminUser])
+
+  const fullName = adminUser?.fullName || "Postarc Administrator"
+  const email = adminUser?.email || "admin@postarc.local"
 
   return (
     <TopNav
@@ -66,22 +77,19 @@ function AdminTopNav({ admin }: AdminTopNavProps) {
             header={
               <VStack gap={0.5} padding={2} width="100%">
                 <Text type="body" weight="semibold" color="primary">
-                  {admin.fullName}
+                  {fullName}
                 </Text>
                 <Text type="supporting" color="secondary">
-                  {admin.email}
+                  {email}
                 </Text>
               </VStack>
             }
             renderTrigger={(triggerProps) => (
               <Avatar
-                name={admin.fullName}
-                src={
-                  admin.avatarUrl ||
-                  "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQJIYCuvmrPJP4avHqKlVrF8Wpkg6sCZ0Wy6WIbii-zV2NqiHKhWsKCr00&s=10"
-                }
+                name={fullName}
+                src={adminUser?.avatarUrl || undefined}
                 size={32}
-                tooltip={admin.fullName}
+                tooltip={fullName}
                 {...triggerProps}
               />
             )}
@@ -100,7 +108,14 @@ function AdminTopNav({ admin }: AdminTopNavProps) {
               { type: "divider" },
               { label: "Switch to Webmail", href: "/mail" },
               { type: "divider" },
-              { label: "Sign out", href: "/", variant: "destructive" },
+              {
+                label: "Sign out",
+                variant: "destructive",
+                onClick: () => {
+                  postarcApi.logout()
+                  window.location.href = "/"
+                },
+              },
             ]}
           />
         </HStack>
@@ -113,7 +128,25 @@ function AdminTopNav({ admin }: AdminTopNavProps) {
 
 function AdminSideNav() {
   const pathname = usePathname()
-  const pool = getStoragePoolSummary(mockCompanyUsers)
+  const [usedGB, setUsedGB] = useState("0.0")
+
+  useEffect(() => {
+    let isMounted = true
+    async function loadStorage() {
+      try {
+        const quota = await postarcApi.getStorageQuota()
+        if (isMounted && quota) {
+          setUsedGB((quota.usedBytes / (1024 * 1024 * 1024)).toFixed(1))
+        }
+      } catch {
+        // Fallback default
+      }
+    }
+    loadStorage()
+    return () => {
+      isMounted = false
+    }
+  }, [])
 
   return (
     <SideNav
@@ -129,13 +162,13 @@ function AdminSideNav() {
               Storage Used
             </Text>
             <Text type="supporting" color="secondary" weight="medium">
-              {pool.usedGB} GB
+              {usedGB} GB
             </Text>
           </HStack>
         </VStack>
       }
     >
-      {/* Primary Action Button (mirrors Compose in /mail) */}
+      {/* Primary Action Button */}
       <VStack padding={2} width="100%">
         <Button
           label="Add User"
@@ -198,7 +231,7 @@ function AdminSideNav() {
 // ─── Admin Shell Layout ──────────────────────────────────────────────────────
 
 interface AdminShellProps {
-  admin: MailboxUser
+  admin?: MailboxUser | null
   children: React.ReactNode
 }
 

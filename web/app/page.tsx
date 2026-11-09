@@ -28,8 +28,8 @@ const contentStyle: CSSProperties = {
 
 export default function LoginPage() {
   const router = useRouter()
-  const [username, setUsername] = useState("admin@enterprise.corp")
-  const [password, setPassword] = useState("••••••••••••")
+  const [username, setUsername] = useState("")
+  const [password, setPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState("")
 
@@ -101,7 +101,7 @@ export default function LoginPage() {
                 Sign in to Postarc
               </Heading>
               <Text type="body" color="secondary" justify="center" size="sm">
-                Enter your credentials or select a demo role below
+                Enter your email credentials to access your mailbox
               </Text>
             </VStack>
 
@@ -161,35 +161,6 @@ export default function LoginPage() {
               isLoading={isLoading}
               onClick={handleSubmit}
             />
-
-            {/* ── Demo Persona Switchers for Instant Review ── */}
-            <VStack gap={2} padding={1}>
-              <Text type="supporting" color="secondary" size="xsm" justify="center">
-                One-Click Demo Roles (RBAC Testing):
-              </Text>
-              <HStack gap={2} hAlign="center" wrap="wrap">
-                <Button
-                  label="Administrator"
-                  variant="secondary"
-                  size="sm"
-                  icon={<ShieldCheck size={14} />}
-                  onClick={() => fillDemoUser("admin@enterprise.corp", "AdminPass#2026")}
-                />
-                <Button
-                  label="Employee Member"
-                  variant="secondary"
-                  size="sm"
-                  icon={<Mail size={14} />}
-                  onClick={() => fillDemoUser("alex@enterprise.corp", "EmployeePass#2026")}
-                />
-                <Button
-                  label="80% Quota User"
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => fillDemoUser("marcus@enterprise.corp", "EmployeePass#2026")}
-                />
-              </HStack>
-            </VStack>
           </VStack>
         </Card>
       </VStack>

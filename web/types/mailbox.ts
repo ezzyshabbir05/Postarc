@@ -86,8 +86,8 @@ export interface MailboxUser extends Record<string, unknown> {
   mustChangePassword: boolean
   lastLoginAt: string | null
   createdAt: string
-  organization: Organization
-  tenant: Organization // Convenience alias matching organization
-  aliases: Alias[]
-  appPasswords: AppPassword[]
+  organization?: Organization
+  tenant?: Organization // Convenience alias matching organization
+  aliases?: Alias[]
+  appPasswords?: AppPassword[]
 }

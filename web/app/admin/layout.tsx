@@ -1,6 +1,5 @@
 import type { Metadata } from "next"
 import { AdminShell } from "@/components/admin-shell"
-import { mockAdminUser } from "@/lib/mock-data"
 
 export const metadata: Metadata = {
   title: "Console — Postarc Admin",
@@ -13,9 +12,8 @@ export default function AdminLayout({
   children: React.ReactNode
 }) {
   return (
-    <AdminShell admin={mockAdminUser}>
+    <AdminShell>
       {children}
     </AdminShell>
   )
 }
-

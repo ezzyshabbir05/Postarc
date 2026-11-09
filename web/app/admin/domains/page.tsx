@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { VStack, HStack } from "@astryxdesign/core/Layout"
 import { Heading, Text } from "@astryxdesign/core/Text"
 import { Card } from "@astryxdesign/core/Card"
@@ -11,9 +11,9 @@ import { Banner } from "@astryxdesign/core/Banner"
 import { Dialog } from "@astryxdesign/core/Dialog"
 import { Table, type TableColumn, pixel, proportional } from "@astryxdesign/core/Table"
 import { Globe, RefreshCw, Plus } from "lucide-react"
-import { mockDomains } from "@/lib/mock-data"
 import type { CustomDomain } from "@/types/mailbox"
 import { AdminPageLayout } from "@/components/admin-page-layout"
+import { postarcApi } from "@/lib/postarc-api"
 
 interface DnsRecordItem extends Record<string, unknown> {
   id: string
@@ -72,14 +72,35 @@ function buildDnsRecords(domain: CustomDomain): DnsRecordItem[] {
 }
 
 export default function AdminDomainsPage() {
-  const [domains, setDomains] = useState<CustomDomain[]>(mockDomains)
-  const [activeDomainId, setActiveDomainId] = useState<string>(domains[0].id)
+  const [domains, setDomains] = useState<CustomDomain[]>([])
+  const [activeDomainId, setActiveDomainId] = useState<string>("")
   const [isChecking, setIsChecking] = useState(false)
   const [checkBanner, setCheckBanner] = useState<string | null>(null)
   const [isAddDomainOpen, setIsAddDomainOpen] = useState(false)
   const [newDomainName, setNewDomainName] = useState("")
 
-  const activeDomain = domains.find((d) => d.id === activeDomainId) || domains[0]
+  useEffect(() => {
+    postarcApi.getDomains().then((data) => {
+      if (data && data.length > 0) {
+        setDomains(data)
+        setActiveDomainId(data[0].id)
+      }
+    }).catch(console.error)
+  }, [])
+
+  const activeDomain = domains.find((d) => d.id === activeDomainId) || domains[0] || {
+    id: "dom_placeholder",
+    name: "example.com",
+    isPrimary: true,
+    isVerified: true,
+    verificationToken: "postarc-verify=pending",
+    mxStatus: "verified" as const,
+    spfStatus: "verified" as const,
+    dkimStatus: "verified" as const,
+    dmarcStatus: "verified" as const,
+    catchAllEnabled: false,
+    createdAt: new Date().toISOString(),
+  }
   const records = buildDnsRecords(activeDomain)
 
   const handleSelectDomain = (domainId: string) => {
@@ -111,28 +132,33 @@ export default function AdminDomainsPage() {
     }, 600)
   }
 
-  const handleAddDomain = () => {
+  const handleAddDomain = async () => {
     if (!newDomainName.trim()) return
     const cleanName = newDomainName.trim().toLowerCase().replace(/^https?:\/\//, "")
-    const newDomain: CustomDomain = {
-      id: `dom_${Date.now()}`,
-      name: cleanName,
-      isPrimary: false,
-      isVerified: false,
-      verificationToken: `postarc-verify=${Math.random().toString(36).substring(2, 12)}`,
-      mxStatus: "pending",
-      spfStatus: "unconfigured",
-      dkimStatus: "unconfigured",
-      dmarcStatus: "unconfigured",
-      catchAllEnabled: false,
-      catchAllTargetEmail: "admin@enterprise.corp",
-      createdAt: new Date().toISOString(),
-    }
+    try {
+      const serverId = await postarcApi.createDomain(cleanName)
+      const newDomain: CustomDomain = {
+        id: serverId,
+        name: cleanName,
+        isPrimary: false,
+        isVerified: false,
+        verificationToken: `postarc-verify=${Math.random().toString(36).substring(2, 12)}`,
+        mxStatus: "pending",
+        spfStatus: "unconfigured",
+        dkimStatus: "unconfigured",
+        dmarcStatus: "unconfigured",
+        catchAllEnabled: false,
+        catchAllTargetEmail: "admin@postarc.local",
+        createdAt: new Date().toISOString(),
+      }
 
-    setDomains((prev) => [...prev, newDomain])
-    setActiveDomainId(newDomain.id)
-    setIsAddDomainOpen(false)
-    setNewDomainName("")
+      setDomains((prev) => [...prev, newDomain])
+      setActiveDomainId(newDomain.id)
+      setIsAddDomainOpen(false)
+      setNewDomainName("")
+    } catch (err: any) {
+      console.error("Failed to add domain:", err)
+    }
     setCheckBanner(`Domain ${cleanName} added. Add the DNS records below at your registrar to complete setup.`)
   }
 

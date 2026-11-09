@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { VStack, HStack } from "@astryxdesign/core/Layout"
 import { Heading, Text } from "@astryxdesign/core/Text"
 import { Card } from "@astryxdesign/core/Card"
@@ -13,16 +13,31 @@ import { Switch } from "@astryxdesign/core/Switch"
 import { Avatar } from "@astryxdesign/core/Avatar"
 import { DropdownMenu } from "@astryxdesign/core/DropdownMenu"
 import { Plus, MoreHorizontal, Search } from "lucide-react"
-import { mockCompanyUsers, mockTenant, mockOrganization, mockDomains } from "@/lib/mock-data"
 import type { MailboxUser, UserStatus } from "@/types/mailbox"
 import { formatDate } from "@/lib/format-date"
 import { AdminPageLayout } from "@/components/admin-page-layout"
+import { postarcApi } from "@/lib/postarc-api"
 
 interface UserRow extends MailboxUser, Record<string, unknown> {}
 
 export default function AdminUsersPage() {
-  const [users, setUsers] = useState<UserRow[]>(mockCompanyUsers as UserRow[])
+  const [users, setUsers] = useState<UserRow[]>([])
+  const [domains, setDomains] = useState<string[]>(["postarc.com"])
   const [searchQuery, setSearchQuery] = useState("")
+
+  useEffect(() => {
+    postarcApi.getUsers().then((data) => {
+      if (data) setUsers(data as UserRow[])
+    }).catch(console.error)
+
+    postarcApi.getDomains().then((doms) => {
+      if (doms && doms.length > 0) {
+        const names = doms.map((d) => d.name)
+        setDomains(names)
+        setNewDomain(names[0])
+      }
+    }).catch(console.error)
+  }, [])
 
   // Modals state
   const [isAddUserOpen, setIsAddUserOpen] = useState(false)
@@ -34,7 +49,7 @@ export default function AdminUsersPage() {
   const [newFullName, setNewFullName] = useState("")
   const [newUsername, setNewUsername] = useState("")
   const [newPassword, setNewPassword] = useState("TempPass#2026!")
-  const [newDomain, setNewDomain] = useState(mockDomains[0].name)
+  const [newDomain, setNewDomain] = useState("postarc.com")
   const [newQuotaGB, setNewQuotaGB] = useState(15)
   const [newMustChangePassword, setNewMustChangePassword] = useState(true)
   const [newAllowImapSmtp, setNewAllowImapSmtp] = useState(true)
@@ -58,37 +73,46 @@ export default function AdminUsersPage() {
     )
   })
 
-  const handleAddUser = () => {
+  const handleAddUser = async () => {
     if (!newFullName.trim() || !newUsername.trim() || !newPassword) return
 
     const email = `${newUsername.trim().toLowerCase()}@${newDomain}`
-    const newUser: UserRow = {
-      id: `usr_${Date.now()}`,
-      fullName: newFullName.trim(),
-      email,
-      role: newIsAdmin ? "admin" : "member",
-      status: newMustChangePassword ? "pending_password_change" : "active",
-      avatarUrl: null,
-      storageUsedBytes: 0,
-      storageTotalBytes: newQuotaGB * 1024 * 1024 * 1024,
-      allowImapSmtp: newAllowImapSmtp,
-      mustChangePassword: newMustChangePassword,
-      lastLoginAt: null,
-      createdAt: new Date().toISOString(),
-      organization: mockOrganization,
-      tenant: mockTenant,
-      aliases: [],
-      appPasswords: [],
-    }
+    try {
+      const serverId = await postarcApi.createUser({
+        fullName: newFullName.trim(),
+        email,
+        role: newIsAdmin ? "admin" : "member",
+        storageTotalBytes: newQuotaGB * 1024 * 1024 * 1024,
+        allowImapSmtp: newAllowImapSmtp,
+        password: newPassword,
+      })
 
-    setUsers((prev) => [newUser, ...prev])
-    setAuditSuccessBanner(
-      `User ${email} provisioned with ${newQuotaGB} GB storage quota. Temporary credentials active.`
-    )
-    setIsAddUserOpen(false)
-    setNewFullName("")
-    setNewUsername("")
-    setNewPassword("TempPass#2026!")
+      const newUser: UserRow = {
+        id: serverId,
+        fullName: newFullName.trim(),
+        email,
+        role: newIsAdmin ? "admin" : "member",
+        status: newMustChangePassword ? "pending_password_change" : "active",
+        avatarUrl: null,
+        storageUsedBytes: 0,
+        storageTotalBytes: newQuotaGB * 1024 * 1024 * 1024,
+        allowImapSmtp: newAllowImapSmtp,
+        mustChangePassword: newMustChangePassword,
+        lastLoginAt: null,
+        createdAt: new Date().toISOString(),
+      }
+
+      setUsers((prev) => [newUser, ...prev])
+      setAuditSuccessBanner(
+        `User ${email} provisioned with ${newQuotaGB} GB storage quota on Postarc Engine.`
+      )
+      setIsAddUserOpen(false)
+      setNewFullName("")
+      setNewUsername("")
+      setNewPassword("TempPass#2026!")
+    } catch (err: any) {
+      console.error("Failed to provision user:", err)
+    }
   }
 
   const handleOpenResetPassword = (user: UserRow) => {
@@ -344,13 +368,13 @@ export default function AdminUsersPage() {
               Domain
             </Text>
             <HStack gap={2}>
-              {mockDomains.map((dom) => (
+              {domains.map((dom) => (
                 <Button
-                  key={dom.id}
-                  label={`@${dom.name}`}
-                  variant={newDomain === dom.name ? "primary" : "secondary"}
+                  key={dom}
+                  label={`@${dom}`}
+                  variant={newDomain === dom ? "primary" : "secondary"}
                   size="sm"
-                  onClick={() => setNewDomain(dom.name)}
+                  onClick={() => setNewDomain(dom)}
                 />
               ))}
             </HStack>

@@ -1,7 +1,6 @@
 import type { Metadata } from "next"
 import { MailProvider } from "@/components/mail-context"
 import { MailShell } from "@/components/mail-shell"
-import { mockMailboxUser } from "@/lib/mock-data"
 
 export const metadata: Metadata = {
   title: "Inbox — Postarc Mail",
@@ -15,7 +14,7 @@ export default function MailLayout({
 }) {
   return (
     <MailProvider>
-      <MailShell user={mockMailboxUser}>
+      <MailShell>
         {children}
       </MailShell>
     </MailProvider>

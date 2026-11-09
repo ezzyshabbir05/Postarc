@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { VStack, HStack } from "@astryxdesign/core/Layout"
 import { Heading, Text } from "@astryxdesign/core/Text"
 import { Card } from "@astryxdesign/core/Card"
@@ -21,53 +21,93 @@ import {
   CheckCircle,
   Palmtree,
 } from "lucide-react"
-import { mockAppPasswords } from "@/lib/mock-data"
 import type { AppPassword } from "@/types/mailbox"
 import { formatDate } from "@/lib/format-date"
+import { useMail } from "@/components/mail-context"
+import { postarcApi } from "@/lib/postarc-api"
 
 interface AppPasswordRow extends AppPassword, Record<string, unknown> {}
 
 export default function MailboxSettingsPage() {
-  const [appPasswords, setAppPasswords] = useState<AppPasswordRow[]>(mockAppPasswords as AppPasswordRow[])
+  const [appPasswords, setAppPasswords] = useState<AppPasswordRow[]>([])
+  const [currentUserEmail, setCurrentUserEmail] = useState("user@postarc.local")
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [newAppName, setNewAppName] = useState("")
   const [generatedPassword, setGeneratedPassword] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
 
+  // Load app passwords, user email, and signature
+  useEffect(() => {
+    const list = postarcApi.getAppPasswords()
+    setAppPasswords(
+      list.map((p) => ({
+        id: p.id,
+        name: p.name,
+        tokenPreview: `postarc_app_••••`,
+        createdAt: p.createdAt,
+        lastUsedAt: p.lastUsedAt || "Never",
+      }))
+    )
+
+    const user = postarcApi.getCurrentUser()
+    if (user?.email) {
+      setCurrentUserEmail(user.email)
+    }
+
+    if (typeof window !== "undefined") {
+      const savedSig = localStorage.getItem("postarc_signature")
+      if (savedSig) setSignature(savedSig)
+    }
+  }, [])
+
   // Signature state
-  const [signature, setSignature] = useState(
-    "Alex Rivera\nSenior Operations Lead | Enterprise Corp\nalex@enterprise.corp | +1 (555) 019-2834"
-  )
+  const [signature, setSignature] = useState("")
   const [isSaved, setIsSaved] = useState(false)
 
   // Vacation Auto-Responder State (Roundcube / JMAP Vacation RFC 8621)
-  const [isVacationEnabled, setIsVacationEnabled] = useState(false)
-  const [vacationSubject, setVacationSubject] = useState("Out of Office: Alex Rivera")
-  const [vacationFromDate, setVacationFromDate] = useState("2026-12-20")
-  const [vacationToDate, setVacationToDate] = useState("2027-01-03")
-  const [vacationBody, setVacationBody] = useState(
-    "Thank you for your message. I am currently out of the office on annual leave with limited access to email. I will respond to your inquiry upon my return on January 4th.\n\nFor urgent matters, please contact support@enterprise.corp."
-  )
+  const { vacationConfig, setVacationConfig } = useMail()
+  const [isVacationEnabled, setIsVacationEnabled] = useState(vacationConfig.isEnabled)
+  const [vacationSubject, setVacationSubject] = useState(vacationConfig.subject)
+  const [vacationFromDate, setVacationFromDate] = useState(vacationConfig.fromDate || "")
+  const [vacationToDate, setVacationToDate] = useState(vacationConfig.toDate || "")
+  const [vacationBody, setVacationBody] = useState(vacationConfig.textBody)
   const [isVacationSaved, setIsVacationSaved] = useState(false)
+
+  const handleSaveVacation = async () => {
+    try {
+      await setVacationConfig({
+        isEnabled: isVacationEnabled,
+        fromDate: vacationFromDate,
+        toDate: vacationToDate,
+        subject: vacationSubject,
+        textBody: vacationBody,
+      })
+      setIsVacationSaved(true)
+    } catch (err: any) {
+      console.error("Failed to save vacation config:", err)
+    }
+  }
 
   const handleGeneratePassword = () => {
     if (!newAppName.trim()) return
-    // Generate 16-character grouped app password
-    const chars = "abcdefghjkmnpqrstuvwxyz23456789"
-    const randomSegment = () =>
-      Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join("")
-    const token = `${randomSegment()}-${randomSegment()}-${randomSegment()}-${randomSegment()}`
+    const isMobile =
+      newAppName.toLowerCase().includes("phone") ||
+      newAppName.toLowerCase().includes("mobile")
+    const { id, name, secret, createdAt } = postarcApi.saveAppPassword({
+      name: newAppName.trim(),
+      clientType: isMobile ? "mobile" : "desktop",
+    })
 
     const newEntry: AppPasswordRow = {
-      id: `app_pwd_${Date.now()}`,
-      name: newAppName.trim(),
-      tokenPreview: `postarc_app_••••_${token.slice(-4)}`,
-      createdAt: new Date().toISOString(),
+      id,
+      name,
+      tokenPreview: `postarc_app_••••_${secret.slice(-4)}`,
+      createdAt,
       lastUsedAt: "Just now",
     }
 
     setAppPasswords((prev) => [newEntry, ...prev])
-    setGeneratedPassword(token)
+    setGeneratedPassword(secret)
   }
 
   const handleCopyPassword = () => {
@@ -86,6 +126,7 @@ export default function MailboxSettingsPage() {
   }
 
   const handleRevokePassword = (id: string) => {
+    postarcApi.deleteAppPassword(id)
     setAppPasswords((prev) => prev.filter((p) => p.id !== id))
   }
 
@@ -227,7 +268,7 @@ export default function MailboxSettingsPage() {
                     Username
                   </Text>
                   <Text type="code" size="sm">
-                    alex@enterprise.corp
+                    {currentUserEmail}
                   </Text>
                 </VStack>
               </HStack>
@@ -272,7 +313,13 @@ export default function MailboxSettingsPage() {
               label="Save Signature"
               variant="primary"
               size="md"
-              onClick={() => setIsSaved(true)}
+              onClick={() => {
+                if (typeof window !== "undefined") {
+                  localStorage.setItem("postarc_signature", signature)
+                }
+                setIsSaved(true)
+                setTimeout(() => setIsSaved(false), 3000)
+              }}
             />
           </HStack>
         </VStack>
@@ -367,7 +414,7 @@ export default function MailboxSettingsPage() {
               label="Save Vacation Settings"
               variant="primary"
               size="md"
-              onClick={() => setIsVacationSaved(true)}
+              onClick={handleSaveVacation}
             />
           </HStack>
         </VStack>

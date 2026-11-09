@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { VStack, HStack } from "@astryxdesign/core/Layout"
 import { Heading, Text } from "@astryxdesign/core/Text"
 import { Card } from "@astryxdesign/core/Card"
@@ -10,24 +10,38 @@ import { Dialog } from "@astryxdesign/core/Dialog"
 import { TextInput } from "@astryxdesign/core/TextInput"
 import { Switch } from "@astryxdesign/core/Switch"
 import { Plus, Users, AtSign, Trash2, Search } from "lucide-react"
-import { mockCompanyAliases, mockDomains } from "@/lib/mock-data"
 import type { Alias } from "@/types/mailbox"
 import { AdminPageLayout } from "@/components/admin-page-layout"
+import { postarcApi } from "@/lib/postarc-api"
 
 interface AliasRow extends Alias, Record<string, unknown> {}
 
 export default function AdminAliasesPage() {
-  const [aliases, setAliases] = useState<AliasRow[]>(mockCompanyAliases as AliasRow[])
+  const [aliases, setAliases] = useState<AliasRow[]>([])
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
 
-  // Form state
-  const [selectedDomain, setSelectedDomain] = useState(mockDomains[0].name)
+  const [domains, setDomains] = useState<string[]>(["postarc.com"])
+  const [selectedDomain, setSelectedDomain] = useState("postarc.com")
   const [aliasHandle, setAliasHandle] = useState("")
   const [displayName, setDisplayName] = useState("")
-  const [targetEmails, setTargetEmails] = useState("alex@enterprise.corp")
+  const [targetEmails, setTargetEmails] = useState("admin@postarc.local")
   const [isGroup, setIsGroup] = useState(false)
   const [sendAsAllowed, setSendAsAllowed] = useState(true)
+
+  useEffect(() => {
+    postarcApi.getAliases().then((data) => {
+      if (data) setAliases(data as AliasRow[])
+    }).catch(console.error)
+
+    postarcApi.getDomains().then((doms) => {
+      if (doms && doms.length > 0) {
+        const names = doms.map((d) => d.name)
+        setDomains(names)
+        setSelectedDomain(names[0])
+      }
+    }).catch(console.error)
+  }, [])
 
   const filteredAliases = aliases.filter((a) => {
     if (!searchQuery.trim()) return true
@@ -39,28 +53,45 @@ export default function AdminAliasesPage() {
     )
   })
 
-  const handleCreateAlias = () => {
+  const handleCreateAlias = async () => {
     if (!aliasHandle.trim() || !displayName.trim()) return
 
-    const newAlias: AliasRow = {
-      id: `als_${Date.now()}`,
-      address: `${aliasHandle.trim().toLowerCase()}@${selectedDomain}`,
-      displayName: displayName.trim(),
-      isActive: true,
-      sendAsAllowed,
-      type: isGroup ? "distribution_group" : "alias",
-      targetEmails: targetEmails.split(",").map((s) => s.trim()),
-      domainName: selectedDomain,
-    }
+    const fullAddress = `${aliasHandle.trim().toLowerCase()}@${selectedDomain}`
+    const targets = targetEmails.split(",").map((s) => s.trim())
+    try {
+      const serverId = await postarcApi.createAlias({
+        address: fullAddress,
+        displayName: displayName.trim(),
+        targetEmails: targets,
+      })
 
-    setAliases((prev) => [newAlias, ...prev])
-    setIsCreateOpen(false)
-    setAliasHandle("")
-    setDisplayName("")
+      const newAlias: AliasRow = {
+        id: serverId,
+        address: fullAddress,
+        displayName: displayName.trim(),
+        isActive: true,
+        sendAsAllowed,
+        type: isGroup ? "distribution_group" : "alias",
+        targetEmails: targets,
+        domainName: selectedDomain,
+      }
+
+      setAliases((prev) => [newAlias, ...prev])
+      setIsCreateOpen(false)
+      setAliasHandle("")
+      setDisplayName("")
+    } catch (err: any) {
+      console.error("Failed to create alias:", err)
+    }
   }
 
-  const handleDelete = (id: string) => {
-    setAliases((prev) => prev.filter((a) => a.id !== id))
+  const handleDelete = async (id: string) => {
+    try {
+      await postarcApi.deleteAlias(id)
+      setAliases((prev) => prev.filter((a) => a.id !== id))
+    } catch (err: any) {
+      console.error("Failed to delete alias:", err)
+    }
   }
 
   const columns: TableColumn<AliasRow>[] = [
@@ -198,13 +229,13 @@ export default function AdminAliasesPage() {
               Domain
             </Text>
             <HStack gap={2}>
-              {mockDomains.map((dom) => (
+              {domains.map((dom) => (
                 <Button
-                  key={dom.id}
-                  label={`@${dom.name}`}
-                  variant={selectedDomain === dom.name ? "primary" : "secondary"}
+                  key={dom}
+                  label={`@${dom}`}
+                  variant={selectedDomain === dom ? "primary" : "secondary"}
                   size="sm"
-                  onClick={() => setSelectedDomain(dom.name)}
+                  onClick={() => setSelectedDomain(dom)}
                 />
               ))}
             </HStack>

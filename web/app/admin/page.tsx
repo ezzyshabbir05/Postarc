@@ -1,5 +1,6 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { VStack, HStack } from "@astryxdesign/core/Layout"
 import { Heading, Text } from "@astryxdesign/core/Text"
 import { Card } from "@astryxdesign/core/Card"
@@ -14,15 +15,10 @@ import {
   Plus,
   ArrowRight,
 } from "lucide-react"
-import {
-  mockCompanyUsers,
-  mockDomains,
-  mockAuditLogs,
-  getStoragePoolSummary,
-} from "@/lib/mock-data"
-import type { AuditLogEntry } from "@/types/mailbox"
+import type { AuditLogEntry, MailboxUser, CustomDomain } from "@/types/mailbox"
 import { formatDate } from "@/lib/format-date"
 import { AdminPageLayout } from "@/components/admin-page-layout"
+import { postarcApi } from "@/lib/postarc-api"
 
 interface AuditRow extends AuditLogEntry, Record<string, unknown> {}
 
@@ -46,10 +42,21 @@ function formatActionName(action: string): string {
 }
 
 export default function AdminOverviewPage() {
-  const pool = getStoragePoolSummary(mockCompanyUsers)
+  const [users, setUsers] = useState<MailboxUser[]>([])
+  const [domains, setDomains] = useState<CustomDomain[]>([])
+  const [auditLogs, setAuditLogs] = useState<AuditRow[]>([])
 
-  const criticalUsers = mockCompanyUsers.filter(
-    (u) => u.storageUsedBytes / u.storageTotalBytes >= 0.95
+  useEffect(() => {
+    postarcApi.getUsers().then((u) => setUsers(u || [])).catch(() => {})
+    postarcApi.getDomains().then((d) => setDomains(d || [])).catch(() => {})
+    postarcApi.getAuditLogs().then((l) => setAuditLogs((l as AuditRow[]) || [])).catch(() => {})
+  }, [])
+
+  const totalUsedBytes = users.reduce((acc, u) => acc + (u.storageUsedBytes || 0), 0)
+  const usedGB = (totalUsedBytes / (1024 * 1024 * 1024)).toFixed(1)
+
+  const criticalUsers = users.filter(
+    (u) => u.storageTotalBytes > 0 && u.storageUsedBytes / u.storageTotalBytes >= 0.95
   )
 
   const auditColumns: TableColumn<AuditRow>[] = [
@@ -156,7 +163,7 @@ export default function AdminOverviewPage() {
               </Text>
               <Users size={18} />
             </HStack>
-            <Heading level={2}>{mockCompanyUsers.length}</Heading>
+            <Heading level={2}>{users.length}</Heading>
           </VStack>
         </Card>
 
@@ -168,7 +175,7 @@ export default function AdminOverviewPage() {
               </Text>
               <Database size={18} />
             </HStack>
-            <Heading level={2}>{pool.usedGB} GB</Heading>
+            <Heading level={2}>{usedGB} GB</Heading>
           </VStack>
         </Card>
 
@@ -180,7 +187,7 @@ export default function AdminOverviewPage() {
               </Text>
               <Globe size={18} />
             </HStack>
-            <Heading level={2}>{mockDomains.length}</Heading>
+            <Heading level={2}>{domains.length}</Heading>
           </VStack>
         </Card>
       </Grid>
@@ -200,7 +207,7 @@ export default function AdminOverviewPage() {
           </HStack>
 
           <Table
-            data={mockAuditLogs.slice(0, 5) as AuditRow[]}
+            data={auditLogs.slice(0, 5)}
             columns={auditColumns}
             idKey="id"
           />

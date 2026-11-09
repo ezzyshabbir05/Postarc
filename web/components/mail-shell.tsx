@@ -36,19 +36,29 @@ import type { MailboxUser } from "@/types/mailbox"
 import { useMail } from "@/components/mail-context"
 import { MailComposer } from "@/components/mail-composer"
 import { useThemeMode } from "@/components/theme-provider"
+import { postarcApi } from "@/lib/postarc-api"
 
 // ─── Webmail Top Navigation ──────────────────────────────────────────────────
 
 interface MailTopNavProps {
-  user: MailboxUser
+  user?: MailboxUser | null
 }
 
-function MailTopNav({ user }: MailTopNavProps) {
+function MailTopNav({ user: initialUser }: MailTopNavProps) {
   const { searchQuery, setSearchQuery } = useMail()
   const { mode, toggleTheme } = useThemeMode()
-  const displayName = user.fullName
-  const email = user.email
-  const isAdmin = user.role === "admin"
+  const [user, setUser] = useState<MailboxUser | null>(initialUser || null)
+
+  useState(() => {
+    if (!user && typeof window !== "undefined") {
+      const cur = postarcApi.getCurrentUser()
+      if (cur) setUser(cur)
+    }
+  })
+
+  const displayName = user?.fullName || "Postarc User"
+  const email = user?.email || "user@postarc.local"
+  const isAdmin = user?.role === "admin"
 
   return (
     <TopNav
@@ -110,10 +120,7 @@ function MailTopNav({ user }: MailTopNavProps) {
             renderTrigger={(triggerProps) => (
               <Avatar
                 name={displayName}
-                src={
-                  user.avatarUrl ||
-                  "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQJIYCuvmrPJP4avHqKlVrF8Wpkg6sCZ0Wy6WIbii-zV2NqiHKhWsKCr00&s=10"
-                }
+                src={user?.avatarUrl || undefined}
                 size={32}
                 tooltip={`${displayName} (${email})`}
                 {...triggerProps}
@@ -132,7 +139,14 @@ function MailTopNav({ user }: MailTopNavProps) {
                   ]
                 : []),
               { type: "divider" as const },
-              { label: "Sign out", href: "/", variant: "destructive" },
+              {
+                label: "Sign out",
+                variant: "destructive",
+                onClick: () => {
+                  postarcApi.logout()
+                  window.location.href = "/"
+                },
+              },
             ]}
           />
         </HStack>
@@ -144,7 +158,7 @@ function MailTopNav({ user }: MailTopNavProps) {
 // ─── Webmail Side Navigation ─────────────────────────────────────────────────
 
 interface MailSideNavProps {
-  user: MailboxUser
+  user?: MailboxUser | null
 }
 
 function MailSideNav({ user }: MailSideNavProps) {
@@ -158,16 +172,17 @@ function MailSideNav({ user }: MailSideNavProps) {
     setSearchQuery,
     customFolders,
     createCustomFolder,
+    quotaInfo,
   } = useMail()
 
   const [isNewFolderOpen, setIsNewFolderOpen] = useState(false)
   const [newFolderName, setNewFolderName] = useState("")
 
-  const usedBytes = user.storageUsedBytes
-  const totalBytes = user.storageTotalBytes
+  const usedBytes = quotaInfo?.usedBytes || user?.storageUsedBytes || 0
+  const totalBytes = quotaInfo?.totalBytes || user?.storageTotalBytes || 15 * 1024 * 1024 * 1024
   const usedGB = (usedBytes / (1024 * 1024 * 1024)).toFixed(1)
   const totalGB = (totalBytes / (1024 * 1024 * 1024)).toFixed(0)
-  const percentageUsed = Math.min(
+  const percentageUsed = quotaInfo?.percent ?? Math.min(
     Math.round((usedBytes / totalBytes) * 100),
     100
   )
@@ -420,14 +435,13 @@ function MailSideNav({ user }: MailSideNavProps) {
 // ─── Webmail Shell Layout ───────────────────────────────────────────────────
 
 interface MailShellProps {
-  user: MailboxUser
+  user?: MailboxUser | null
   children: React.ReactNode
 }
 
 export function MailShell({ user, children }: MailShellProps) {
-  const percentageUsed = Math.round(
-    (user.storageUsedBytes / user.storageTotalBytes) * 100
-  )
+  const { quotaInfo } = useMail()
+  const percentageUsed = quotaInfo?.percent ?? 0
   const isNearLimit = percentageUsed >= 80
 
   return (

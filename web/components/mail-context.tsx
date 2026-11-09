@@ -4,7 +4,6 @@ import React, { createContext, useContext, useState, useMemo, useEffect } from "
 import { useToast } from "@astryxdesign/core/Toast"
 import { Button } from "@astryxdesign/core/Button"
 import type { EmailThread, EmailCategory, EmailFolder, EmailAttachment, ThreadMessage, CustomMailboxFolder } from "@/types/email"
-import { initialMockEmails } from "@/lib/mock-emails"
 import { formatDateTime } from "@/lib/format-date"
 import {
   postarcApi,
@@ -43,8 +42,8 @@ interface MailContextType {
   }
   // Folder management
   customFolders: CustomMailboxFolder[]
-  createCustomFolder: (name: string, color?: string) => void
-  deleteCustomFolder: (id: string) => void
+  createCustomFolder: (name: string, color?: string) => Promise<void>
+  deleteCustomFolder: (id: string) => Promise<void>
   moveEmailsToFolder: (ids: string[], targetFolder: EmailFolder) => void
   // Roundcube: Identities
   identities: PostarcIdentity[]
@@ -64,7 +63,7 @@ interface MailContextType {
   importEmlFile: (file: File) => Promise<void>
   // Roundcube: Vacation auto-responder
   vacationConfig: VacationResponseConfig
-  setVacationConfig: (config: VacationResponseConfig) => void
+  setVacationConfig: (config: VacationResponseConfig) => Promise<void>
   // Roundcube: Quota gauge
   quotaInfo: QuotaInfo
   // Standard actions
@@ -89,7 +88,7 @@ interface MailContextType {
     body: string,
     attachments?: EmailAttachment[],
     identityId?: string
-  ) => void
+  ) => Promise<void>
   saveDraft: (to: string, subject: string, body: string, attachments?: EmailAttachment[]) => void
   dismissNotification: () => void
   setActiveCategory: (category: EmailCategory) => void
@@ -100,7 +99,7 @@ interface MailContextType {
 const MailContext = createContext<MailContextType | null>(null)
 
 export function MailProvider({ children }: { children: React.ReactNode }) {
-  const [emails, setEmails] = useState<EmailThread[]>(initialMockEmails)
+  const [emails, setEmails] = useState<EmailThread[]>([])
   const [activeEmailId, setActiveEmailId] = useState<string | null>(null)
   const [activeCategory, setActiveCategory] = useState<EmailCategory>("primary")
   const [activeFolder, setActiveFolder] = useState<EmailFolder>("inbox")
@@ -108,46 +107,119 @@ export function MailProvider({ children }: { children: React.ReactNode }) {
   const [isComposeOpen, setIsComposeOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
 
-  // Roundcube Features State
-  const [identities] = useState<PostarcIdentity[]>(postarcApi.getIdentities())
-  const [activeIdentity, setActiveIdentity] = useState<PostarcIdentity>(identities[0])
-  const [cannedResponses, setCannedResponses] = useState<CannedResponse[]>(postarcApi.getCannedResponses())
-  const [contacts] = useState<PostarcContact[]>(postarcApi.getContacts())
+  // Roundcube Real State (Zero Mock)
+  const defaultIdentity: PostarcIdentity = {
+    id: "id_default",
+    name: "Mailbox Owner",
+    email: "user@postarc.local",
+    isDefault: true,
+  }
+  const [identities, setIdentities] = useState<PostarcIdentity[]>([defaultIdentity])
+  const [activeIdentity, setActiveIdentity] = useState<PostarcIdentity>(defaultIdentity)
+  const [cannedResponses, setCannedResponses] = useState<CannedResponse[]>([])
+  const [contacts, setContacts] = useState<PostarcContact[]>([])
   const [allowedRemoteImages, setAllowedRemoteImages] = useState<Set<string>>(new Set())
-  const [vacationConfig, setVacationConfig] = useState<VacationResponseConfig>(postarcApi.getVacationConfig())
-  const [quotaInfo] = useState<QuotaInfo>(postarcApi.getStorageQuota())
+  const [vacationConfig, setVacationConfigState] = useState<VacationResponseConfig>({
+    isEnabled: false,
+    subject: "",
+    textBody: "",
+  })
+  const [quotaInfo, setQuotaInfo] = useState<QuotaInfo>({
+    usedBytes: 0,
+    totalBytes: 15 * 1024 * 1024 * 1024,
+    percent: 0,
+  })
 
-  // Custom Folders
-  const [customFolders, setCustomFolders] = useState<CustomMailboxFolder[]>([
-    { id: "cf_projects", name: "Strategic Projects", totalCount: 14, unreadCount: 2, color: "#3B82F6" },
-    { id: "cf_receipts", name: "Invoices & Receipts", totalCount: 28, unreadCount: 0, color: "#10B981" },
-  ])
+  // Custom Folders from JMAP Mailboxes
+  const [customFolders, setCustomFolders] = useState<CustomMailboxFolder[]>([])
 
-  // Live JMAP Sync: query engine whenever active folder changes
+  const showToast = useToast()
+
+  // ── Initial Live Data Hydration from Postarc Engine ────────────────────────
+  useEffect(() => {
+    let isMounted = true
+
+    // Fetch JMAP Mailboxes
+    postarcApi
+      .getMailboxes()
+      .then((mboxes) => {
+        if (!isMounted) return
+        const custom = mboxes
+          .filter((m) => !m.role)
+          .map((m) => ({
+            id: m.id,
+            name: m.name,
+            totalCount: m.totalEmails,
+            unreadCount: m.unreadEmails,
+            color: "#6366F1",
+          }))
+        setCustomFolders(custom)
+      })
+      .catch(() => {})
+
+    // Fetch JMAP Identities
+    postarcApi
+      .getIdentities()
+      .then((ids) => {
+        if (!isMounted || ids.length === 0) return
+        setIdentities(ids)
+        const def = ids.find((i) => i.isDefault) || ids[0]
+        setActiveIdentity(def)
+      })
+      .catch(() => {})
+
+    // Fetch JMAP Contacts
+    postarcApi
+      .getContacts()
+      .then((cnts) => {
+        if (!isMounted) return
+        setContacts(cnts)
+      })
+      .catch(() => {})
+
+    // Fetch JMAP Quota
+    postarcApi
+      .getStorageQuota()
+      .then((q) => {
+        if (!isMounted) return
+        setQuotaInfo(q)
+      })
+      .catch(() => {})
+
+    // Fetch JMAP Vacation Response
+    postarcApi
+      .getVacationConfig()
+      .then((v) => {
+        if (!isMounted) return
+        setVacationConfigState(v)
+      })
+      .catch(() => {})
+
+    // Load Canned Responses from Local Persistent Store
+    setCannedResponses(postarcApi.getCannedResponses())
+
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
+  // ── Live Email Fetch on Folder Change ─────────────────────────────────────
   useEffect(() => {
     let isMounted = true
     postarcApi
       .getEmails(activeFolder)
       .then((liveEmails) => {
-        if (isMounted && liveEmails && liveEmails.length > 0) {
-          setEmails((prev) => {
-            const liveIds = new Set(liveEmails.map((e) => e.id))
-            const localOnly = prev.filter(
-              (e) => !liveIds.has(e.id) && (e.folder === "sent" || e.folder === "drafts" || e.id.startsWith("imported_"))
-            )
-            return [...liveEmails, ...localOnly]
-          })
+        if (isMounted) {
+          setEmails(liveEmails)
         }
       })
       .catch(() => {
-        // Gracefully keep current state in preview / offline mode
+        if (isMounted) setEmails([])
       })
     return () => {
       isMounted = false
     }
   }, [activeFolder])
-
-  const showToast = useToast()
 
   const triggerActionToast = (message: string, snapshots: EmailSnapshot[]) => {
     let dismissToast: (() => void) | null = null
@@ -206,7 +278,7 @@ export function MailProvider({ children }: { children: React.ReactNode }) {
     }
   }, [emails])
 
-  // Drag and Drop & Folder Moving
+  // ── Drag and Drop & Folder Moving with Real JMAP Persist ──────────────────
   const moveEmailsToFolder = (ids: string[], targetFolder: EmailFolder) => {
     if (ids.length === 0) return
     const idSet = new Set(ids)
@@ -219,6 +291,7 @@ export function MailProvider({ children }: { children: React.ReactNode }) {
         isUnread: e.isUnread,
       }))
 
+    // Optimistic UI update
     setEmails((prev) =>
       prev.map((e) => (idSet.has(e.id) ? { ...e, folder: targetFolder } : e))
     )
@@ -228,40 +301,60 @@ export function MailProvider({ children }: { children: React.ReactNode }) {
     }
     setSelectedIds(new Set())
 
+    // Real JMAP mutation
+    ids.forEach((id) => {
+      postarcApi.moveEmail(id, targetFolder).catch(console.error)
+    })
+
     triggerActionToast(
       `Moved ${ids.length} message${ids.length > 1 ? "s" : ""} to ${targetFolder}.`,
       snapshots
     )
   }
 
-  const createCustomFolder = (name: string, color?: string) => {
+  const createCustomFolder = async (name: string, color?: string) => {
     if (!name.trim()) return
-    const newFolder: CustomMailboxFolder = {
-      id: `cf_${Date.now()}`,
-      name: name.trim(),
-      totalCount: 0,
-      unreadCount: 0,
-      color: color || "#6366F1",
+    try {
+      const serverId = await postarcApi.createMailbox(name.trim())
+      const newFolder: CustomMailboxFolder = {
+        id: serverId,
+        name: name.trim(),
+        totalCount: 0,
+        unreadCount: 0,
+        color: color || "#6366F1",
+      }
+      setCustomFolders((prev) => [...prev, newFolder])
+      showToast({
+        body: `Folder "${name}" created on server.`,
+        type: "info",
+        isAutoHide: true,
+        autoHideDuration: 3000,
+      })
+    } catch (err: any) {
+      showToast({
+        body: `Failed to create folder: ${err.message}`,
+        type: "error",
+      })
     }
-    setCustomFolders((prev) => [...prev, newFolder])
-    showToast({
-      body: `Folder "${name}" created.`,
-      type: "info",
-      isAutoHide: true,
-      autoHideDuration: 3000,
-    })
   }
 
-  const deleteCustomFolder = (id: string) => {
-    setCustomFolders((prev) => prev.filter((f) => f.id !== id))
-    // Move any emails in that folder back to inbox
-    setEmails((prev) => prev.map((e) => (e.folder === id ? { ...e, folder: "inbox" } : e)))
-    if (activeFolder === id) {
-      setActiveFolder("inbox")
+  const deleteCustomFolder = async (id: string) => {
+    try {
+      await postarcApi.deleteMailbox(id)
+      setCustomFolders((prev) => prev.filter((f) => f.id !== id))
+      setEmails((prev) => prev.map((e) => (e.folder === id ? { ...e, folder: "inbox" } : e)))
+      if (activeFolder === id) {
+        setActiveFolder("inbox")
+      }
+    } catch (err: any) {
+      showToast({
+        body: `Failed to delete folder: ${err.message}`,
+        type: "error",
+      })
     }
   }
 
-  // Canned Responses
+  // ── Canned Responses ──────────────────────────────────────────────────────
   const addCannedResponse = (title: string, body: string, subject?: string) => {
     const newCr: CannedResponse = {
       id: `cr_${Date.now()}`,
@@ -270,7 +363,8 @@ export function MailProvider({ children }: { children: React.ReactNode }) {
       subject,
       updatedAt: new Date().toISOString().split("T")[0],
     }
-    setCannedResponses((prev) => [newCr, ...prev])
+    postarcApi.saveCannedResponse(newCr)
+    setCannedResponses(postarcApi.getCannedResponses())
     showToast({
       body: "Template saved.",
       type: "info",
@@ -280,10 +374,11 @@ export function MailProvider({ children }: { children: React.ReactNode }) {
   }
 
   const deleteCannedResponse = (id: string) => {
-    setCannedResponses((prev) => prev.filter((c) => c.id !== id))
+    postarcApi.deleteCannedResponse(id)
+    setCannedResponses(postarcApi.getCannedResponses())
   }
 
-  // Remote image blocking
+  // ── Remote Image Blocking ─────────────────────────────────────────────────
   const allowRemoteImagesForEmail = (emailId: string) => {
     setAllowedRemoteImages((prev) => new Set([...prev, emailId]))
     showToast({
@@ -294,7 +389,7 @@ export function MailProvider({ children }: { children: React.ReactNode }) {
     })
   }
 
-  // EML Export (RFC 822)
+  // ── EML Export (RFC 822) ──────────────────────────────────────────────────
   const exportEmailAsEml = (emailId: string) => {
     const email = emails.find((e) => e.id === emailId)
     if (!email) return
@@ -329,7 +424,7 @@ export function MailProvider({ children }: { children: React.ReactNode }) {
     })
   }
 
-  // EML Import
+  // ── EML Import ────────────────────────────────────────────────────────────
   const importEmlFile = async (file: File) => {
     const text = await file.text()
     const subjectMatch = text.match(/^Subject:\s*(.*)$/im)
@@ -367,11 +462,13 @@ export function MailProvider({ children }: { children: React.ReactNode }) {
     })
   }
 
+  // ── Email Read & Star Real JMAP Sync ──────────────────────────────────────
   const openEmail = (id: string) => {
     setActiveEmailId(id)
     setEmails((prev) =>
       prev.map((e) => (e.id === id ? { ...e, isUnread: false } : e))
     )
+    postarcApi.updateEmailKeywords(id, { $seen: true }).catch(console.error)
   }
 
   const closeEmail = () => {
@@ -380,11 +477,27 @@ export function MailProvider({ children }: { children: React.ReactNode }) {
 
   const toggleStar = (id: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation()
+    const target = emails.find((item) => item.id === id)
+    if (!target) return
+    const nextStarred = !target.isStarred
+
     setEmails((prev) =>
       prev.map((item) =>
-        item.id === id ? { ...item, isStarred: !item.isStarred } : item
+        item.id === id ? { ...item, isStarred: nextStarred } : item
       )
     )
+    postarcApi.updateEmailKeywords(id, { $flagged: nextStarred }).catch(console.error)
+  }
+
+  const toggleEmailRead = (id: string) => {
+    const target = emails.find((item) => item.id === id)
+    if (!target) return
+    const nextUnread = !target.isUnread
+
+    setEmails((prev) =>
+      prev.map((e) => (e.id === id ? { ...e, isUnread: nextUnread } : e))
+    )
+    postarcApi.updateEmailKeywords(id, { $seen: !nextUnread }).catch(console.error)
   }
 
   const toggleSelect = (id: string) => {
@@ -440,7 +553,14 @@ export function MailProvider({ children }: { children: React.ReactNode }) {
       : []
 
     if (idsToDelete.length === 0) return
-    moveEmailsToFolder(idsToDelete, "trash")
+    idsToDelete.forEach((id) => {
+      postarcApi.deleteEmail(id).catch(console.error)
+    })
+    setEmails((prev) => prev.filter((e) => !idsToDelete.includes(e.id)))
+    setSelectedIds(new Set())
+    if (activeEmailId && idsToDelete.includes(activeEmailId)) {
+      setActiveEmailId(null)
+    }
   }
 
   const reportSpam = (idsOrEvent?: string[] | React.MouseEvent) => {
@@ -457,9 +577,11 @@ export function MailProvider({ children }: { children: React.ReactNode }) {
   }
 
   const markSelectedAsRead = () => {
-    const targets = selectedIds.size > 0 ? selectedIds : activeEmailId ? new Set([activeEmailId]) : new Set()
-    if (targets.size === 0) return
-
+    const targets: Set<string> =
+      selectedIds.size > 0 ? selectedIds : activeEmailId ? new Set<string>([activeEmailId]) : new Set<string>()
+    targets.forEach((id) => {
+      postarcApi.updateEmailKeywords(id, { $seen: true }).catch(console.error)
+    })
     setEmails((prev) =>
       prev.map((e) => (targets.has(e.id) ? { ...e, isUnread: false } : e))
     )
@@ -467,9 +589,11 @@ export function MailProvider({ children }: { children: React.ReactNode }) {
   }
 
   const markSelectedAsUnread = () => {
-    const targets = selectedIds.size > 0 ? selectedIds : activeEmailId ? new Set([activeEmailId]) : new Set()
-    if (targets.size === 0) return
-
+    const targets: Set<string> =
+      selectedIds.size > 0 ? selectedIds : activeEmailId ? new Set<string>([activeEmailId]) : new Set<string>()
+    targets.forEach((id) => {
+      postarcApi.updateEmailKeywords(id, { $seen: false }).catch(console.error)
+    })
     setEmails((prev) =>
       prev.map((e) => (targets.has(e.id) ? { ...e, isUnread: true } : e))
     )
@@ -477,20 +601,9 @@ export function MailProvider({ children }: { children: React.ReactNode }) {
     if (activeEmailId) setActiveEmailId(null)
   }
 
-  const toggleEmailRead = (id: string) => {
-    setEmails((prev) =>
-      prev.map((e) => (e.id === id ? { ...e, isUnread: !e.isUnread } : e))
-    )
-  }
-
   const snoozeEmails = (ids: string[], untilText: string) => {
     if (ids.length === 0) return
-    const idSet = new Set(ids)
-    setEmails((prev) =>
-      prev.map((e) => (idSet.has(e.id) ? { ...e, folder: "snoozed" } : e))
-    )
-    if (activeEmailId && idSet.has(activeEmailId)) setActiveEmailId(null)
-    setSelectedIds(new Set())
+    moveEmailsToFolder(ids, "snoozed")
     showToast({
       body: `Snoozed ${ids.length} message(s) until ${untilText}.`,
       type: "info",
@@ -504,6 +617,13 @@ export function MailProvider({ children }: { children: React.ReactNode }) {
 
     const thread = emails.find((e) => e.id === threadId)
     if (!thread) return
+
+    postarcApi.sendEmail({
+      to: thread.senderEmail,
+      subject: `Re: ${thread.subject}`,
+      body: replyText,
+      fromIdentityId: activeIdentity.id,
+    }).catch(console.error)
 
     const newReply: ThreadMessage = {
       id: `rep_${Date.now()}`,
@@ -545,7 +665,7 @@ export function MailProvider({ children }: { children: React.ReactNode }) {
     )
 
     showToast({
-      body: "Reply sent.",
+      body: "Reply sent via Postarc Engine.",
       type: "info",
       isAutoHide: true,
       autoHideDuration: 3000,
@@ -555,7 +675,7 @@ export function MailProvider({ children }: { children: React.ReactNode }) {
   const openCompose = () => setIsComposeOpen(true)
   const closeCompose = () => setIsComposeOpen(false)
 
-  const sendEmail = (
+  const sendEmail = async (
     to: string,
     subject: string,
     body: string,
@@ -564,41 +684,47 @@ export function MailProvider({ children }: { children: React.ReactNode }) {
   ) => {
     const sender = identities.find((i) => i.id === identityId) || activeIdentity
 
-    const newMsgId = `sent_${Date.now()}`
-    const newMsg: EmailThread = {
-      id: newMsgId,
-      senderName: sender.name,
-      senderEmail: sender.email,
-      recipientEmail: to,
-      subject: subject || "(no subject)",
-      snippet: body.slice(0, 100),
-      body,
-      timestamp: "Just now",
-      fullDate: formatDateTime(new Date()),
-      category: "primary",
-      folder: "sent",
-      isUnread: false,
-      isStarred: false,
-      attachments,
+    try {
+      const res = await postarcApi.sendEmail({
+        to,
+        subject,
+        body,
+        fromIdentityId: sender.id,
+        attachments,
+      })
+
+      const newMsg: EmailThread = {
+        id: res.messageId || `sent_${Date.now()}`,
+        senderName: sender.name,
+        senderEmail: sender.email,
+        recipientEmail: to,
+        subject: subject || "(no subject)",
+        snippet: body.slice(0, 100),
+        body,
+        timestamp: "Just now",
+        fullDate: formatDateTime(new Date()),
+        category: "primary",
+        folder: "sent",
+        isUnread: false,
+        isStarred: false,
+        attachments,
+      }
+
+      setEmails((prev) => [newMsg, ...prev])
+      setIsComposeOpen(false)
+
+      showToast({
+        body: `Message sent from ${sender.email}.`,
+        type: "info",
+        isAutoHide: true,
+        autoHideDuration: 4000,
+      })
+    } catch (err: any) {
+      showToast({
+        body: `Failed to send email: ${err.message}`,
+        type: "error",
+      })
     }
-
-    setEmails((prev) => [newMsg, ...prev])
-    setIsComposeOpen(false)
-
-    postarcApi.sendEmail({
-      to,
-      subject,
-      body,
-      fromIdentityId: sender.id,
-      attachments,
-    })
-
-    showToast({
-      body: `Message sent from ${sender.email}.`,
-      type: "info",
-      isAutoHide: true,
-      autoHideDuration: 4000,
-    })
   }
 
   const saveDraft = (to: string, subject: string, body: string, attachments?: EmailAttachment[]) => {
@@ -622,12 +748,11 @@ export function MailProvider({ children }: { children: React.ReactNode }) {
     }
 
     setEmails((prev) => [newDraft, ...prev])
-    showToast({
-      body: "Draft saved.",
-      type: "info",
-      isAutoHide: true,
-      autoHideDuration: 3000,
-    })
+  }
+
+  const setVacationConfig = async (config: VacationResponseConfig) => {
+    await postarcApi.setVacationConfig(config)
+    setVacationConfigState(config)
   }
 
   return (
@@ -690,9 +815,9 @@ export function MailProvider({ children }: { children: React.ReactNode }) {
 }
 
 export function useMail() {
-  const context = useContext(MailContext)
-  if (!context) {
+  const ctx = useContext(MailContext)
+  if (!ctx) {
     throw new Error("useMail must be used within a MailProvider")
   }
-  return context
+  return ctx
 }

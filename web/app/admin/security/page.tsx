@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { VStack, HStack } from "@astryxdesign/core/Layout"
 import { Heading, Text } from "@astryxdesign/core/Text"
 import { Card } from "@astryxdesign/core/Card"
@@ -9,38 +9,52 @@ import { Banner } from "@astryxdesign/core/Banner"
 import { TextInput } from "@astryxdesign/core/TextInput"
 import { Table, type TableColumn, pixel, proportional } from "@astryxdesign/core/Table"
 import { ShieldCheck, Search } from "lucide-react"
-import { mockAuditLogs, mockTenant } from "@/lib/mock-data"
 import type { AuditLogEntry } from "@/types/mailbox"
 import { formatDateTime } from "@/lib/format-date"
 import { AdminPageLayout } from "@/components/admin-page-layout"
+import { postarcApi } from "@/lib/postarc-api"
 
 interface AuditRow extends AuditLogEntry, Record<string, unknown> {}
 
 export default function AdminSecurityPage() {
-  const [enforce2FA, setEnforce2FA] = useState(mockTenant.enforce2FA)
-  const [globalImapSmtp, setGlobalImapSmtp] = useState(mockTenant.allowImapSmtpGlobal)
+  const [enforce2FA, setEnforce2FA] = useState(false)
+  const [globalImapSmtp, setGlobalImapSmtp] = useState(true)
   const [bannerMessage, setBannerMessage] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
+  const [auditLogs, setAuditLogs] = useState<AuditRow[]>([])
+
+  useEffect(() => {
+    postarcApi.getSecuritySettings().then((s) => {
+      setEnforce2FA(Boolean(s.enforce2FA))
+      setGlobalImapSmtp(Boolean(s.allowImapSmtpGlobal))
+    }).catch(console.error)
+
+    postarcApi.getAuditLogs().then((logs) => {
+      if (logs) setAuditLogs(logs as AuditRow[])
+    }).catch(console.error)
+  }, [])
 
   const handleToggle2FA = (checked: boolean) => {
     setEnforce2FA(checked)
+    postarcApi.updateSecuritySettings({ enforce2fa: checked }).catch(console.error)
     setBannerMessage(
       checked
-        ? "Two-Factor Authentication policy enforced for all organization members. Users will be prompted to set up an authenticator app on next login."
+        ? "Two-Factor Authentication policy enforced for all organization members on Postarc Engine."
         : "Two-Factor Authentication policy relaxed to optional."
     )
   }
 
   const handleToggleImap = (checked: boolean) => {
     setGlobalImapSmtp(checked)
+    postarcApi.updateSecuritySettings({ requireTlsForOutbound: checked }).catch(console.error)
     setBannerMessage(
       checked
-        ? "Third-party IMAP/SMTP access enabled company-wide. Users can generate App Passwords for Apple Mail, Outlook, and Thunderbird."
-        : "Third-party IMAP/SMTP access disabled company-wide. Webmail is now the only permitted client interface."
+        ? "Third-party IMAP/SMTP access enabled company-wide."
+        : "Third-party IMAP/SMTP access disabled company-wide."
     )
   }
 
-  const filteredLogs = mockAuditLogs.filter((log) => {
+  const filteredLogs = auditLogs.filter((log) => {
     if (!searchQuery.trim()) return true
     const q = searchQuery.toLowerCase()
     return (

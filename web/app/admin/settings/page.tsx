@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { VStack, HStack } from "@astryxdesign/core/Layout"
 import { Heading, Text } from "@astryxdesign/core/Text"
 import { Card } from "@astryxdesign/core/Card"
@@ -8,18 +8,56 @@ import { Button } from "@astryxdesign/core/Button"
 import { TextInput } from "@astryxdesign/core/TextInput"
 import { TextArea } from "@astryxdesign/core/TextArea"
 import { Banner } from "@astryxdesign/core/Banner"
-import { mockOrganization } from "@/lib/mock-data"
+import { postarcApi } from "@/lib/postarc-api"
 import { AdminPageLayout } from "@/components/admin-page-layout"
 
 export default function AdminSettingsPage() {
-  const [orgName, setOrgName] = useState(mockOrganization.name)
+  const [orgName, setOrgName] = useState("Postarc Organization")
+  const [primaryDomain, setPrimaryDomain] = useState("postarc.local")
   const [defaultQuota, setDefaultQuota] = useState("15")
-  const [disclaimer, setDisclaimer] = useState(mockOrganization.globalDisclaimer || "")
+  const [disclaimer, setDisclaimer] = useState("")
   const [isSaved, setIsSaved] = useState(false)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
-  const handleSave = () => {
-    setIsSaved(true)
-    setTimeout(() => setIsSaved(false), 3000)
+  useEffect(() => {
+    let isMounted = true
+    async function loadSettings() {
+      try {
+        const [settings, domains] = await Promise.all([
+          postarcApi.getSecuritySettings(),
+          postarcApi.getDomains(),
+        ])
+        if (!isMounted) return
+        if (settings?.name) setOrgName(settings.name)
+        if (settings?.globalDisclaimer) setDisclaimer(settings.globalDisclaimer)
+        if (domains && domains.length > 0) {
+          const prim = domains.find((d) => d.isPrimary) || domains[0]
+          setPrimaryDomain(prim.name)
+        }
+      } catch (err: any) {
+        if (isMounted) {
+          setErrorMessage(err.message || "Failed to load settings from Postarc Engine.")
+        }
+      }
+    }
+    loadSettings()
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
+  const handleSave = async () => {
+    setErrorMessage(null)
+    try {
+      await postarcApi.updateSecuritySettings({
+        name: orgName,
+        globalDisclaimer: disclaimer,
+      })
+      setIsSaved(true)
+      setTimeout(() => setIsSaved(false), 3000)
+    } catch (err: any) {
+      setErrorMessage(err.message || "Failed to save settings.")
+    }
   }
 
   return (
@@ -44,6 +82,16 @@ export default function AdminSettingsPage() {
         />
       )}
 
+      {errorMessage && (
+        <Banner
+          status="error"
+          title={errorMessage}
+          container="card"
+          isDismissable
+          onDismiss={() => setErrorMessage(null)}
+        />
+      )}
+
       {/* ── Organization Profile ── */}
       <Card padding={5} width="100%">
         <VStack gap={4} width="100%">
@@ -62,7 +110,7 @@ export default function AdminSettingsPage() {
             </Text>
             <HStack gap={2} vAlign="center">
               <Text type="code" size="base">
-                {mockOrganization.primaryDomainName}
+                {primaryDomain}
               </Text>
               <Text type="supporting" color="secondary">
                 (Primary)
