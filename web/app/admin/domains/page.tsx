@@ -66,7 +66,7 @@ export default function AdminDomainsPage() {
     dkimStatus: "verified" as const,
     dmarcStatus: "verified" as const,
     catchAllEnabled: false,
-    createdAt: new Date().toISOString(),
+    createdAt: "2026-01-01T00:00:00.000Z",
   }
   const records = buildDnsRecords(activeDomain)
 

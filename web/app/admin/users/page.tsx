@@ -136,7 +136,7 @@ export default function AdminUsersPage() {
       )
     )
     setAuditSuccessBanner(
-      `Admin [admin@enterprise.corp] reset password for [${selectedUser.email}] on ${formatDate(new Date())} from IP 192.168.1.5 (Audit Entry #AUD-${Date.now().toString().slice(-4)}).`
+      `Administrator reset password for [${selectedUser.email}] on ${formatDate(new Date())} (Audit Entry #AUD-${Date.now().toString().slice(-4)}).`
     )
     setIsResetPasswordOpen(false)
   }

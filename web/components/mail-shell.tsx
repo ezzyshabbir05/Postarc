@@ -234,7 +234,7 @@ function MailSideNav({ user }: MailSideNavProps) {
         <VStack gap={1} width="100%" padding={2}>
           <HStack hAlign="between" vAlign="center">
             <Text type="supporting" color="secondary" size="xsm">
-              {email || "Storage"}
+              {user?.email || "Storage"}
             </Text>
             <Text
               type="supporting"
