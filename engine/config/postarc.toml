@@ -1,0 +1,94 @@
+# =============================================================================
+# Postarc Enterprise Mail & Collaboration Engine Configuration
+# =============================================================================
+
+[server]
+hostname = "%{env:POSTARC_HOSTNAME}%"
+
+[tracer]
+type = "stdout"
+level = "info"
+
+# -----------------------------------------------------------------------------
+# Listeners Configuration
+# -----------------------------------------------------------------------------
+[server.listener.smtp]
+bind = ["[::]:25", "0.0.0.0:25"]
+protocol = "smtp"
+
+[server.listener.submissions]
+bind = ["[::]:465", "0.0.0.0:465"]
+protocol = "smtp"
+tls.implicit = true
+
+[server.listener.submission]
+bind = ["[::]:587", "0.0.0.0:587"]
+protocol = "smtp"
+
+[server.listener.imap]
+bind = ["[::]:143", "0.0.0.0:143"]
+protocol = "imap"
+
+[server.listener.imaps]
+bind = ["[::]:993", "0.0.0.0:993"]
+protocol = "imap"
+tls.implicit = true
+
+[server.listener.pop3]
+bind = ["[::]:110", "0.0.0.0:110"]
+protocol = "pop3"
+
+[server.listener.pop3s]
+bind = ["[::]:995", "0.0.0.0:995"]
+protocol = "pop3"
+tls.implicit = true
+
+[server.listener.sieve]
+bind = ["[::]:4190", "0.0.0.0:4190"]
+protocol = "managesieve"
+
+[server.listener.http]
+bind = ["[::]:8080", "0.0.0.0:8080"]
+protocol = "http"
+
+# -----------------------------------------------------------------------------
+# Storage & Database Backends
+# -----------------------------------------------------------------------------
+[store.data]
+type = "postgresql"
+url = "%{env:POSTARC_DB_URL}%"
+
+[store.blob]
+type = "postgresql"
+url = "%{env:POSTARC_DB_URL}%"
+compression.algorithm = "zstd"
+
+[store.lookup]
+type = "postgresql"
+url = "%{env:POSTARC_DB_URL}%"
+
+# -----------------------------------------------------------------------------
+# Directory & Authentication
+# -----------------------------------------------------------------------------
+[directory.internal]
+type = "internal"
+store = "data"
+
+[authentication.fallback-admin]
+user = "%{env:POSTARC_ADMIN_USER}%"
+secret = "%{env:POSTARC_ADMIN_PASSWORD}%"
+roles = ["admin", "superadmin"]
+
+# -----------------------------------------------------------------------------
+# Sieve, Anti-Spam & Threat Protection
+# -----------------------------------------------------------------------------
+[spam-filter]
+enable = true
+
+[spam-filter.dnsbl]
+enable = true
+providers = [
+    "zen.spamhaus.org",
+    "bl.spamcop.net",
+    "b.barracudacentral.org"
+]
