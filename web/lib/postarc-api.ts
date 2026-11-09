@@ -94,14 +94,19 @@ class PostarcClient {
   async jmapCall(using: string[], methodCalls: [string, Record<string, unknown>, string][]): Promise<any> {
     const token = this.getToken();
     if (!token) {
-      throw new Error("Authentication required: No Postarc JWT token found.");
+      throw new Error("Authentication required: No Postarc authorization token found.");
     }
+
+    const authHeader =
+      token.startsWith("Basic ") || token.startsWith("Bearer ")
+        ? token
+        : `Bearer ${token}`;
 
     const res = await fetch(`${this.baseUrl}/jmap/`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
+        Authorization: authHeader,
       },
       body: JSON.stringify({ using, methodCalls }),
     });
@@ -115,10 +120,43 @@ class PostarcClient {
   }
 
   // ---------------------------------------------------------------------------
-  // Authentication & Session
+  // Authentication & Session (RFC 8620 Basic Auth & OAuth2)
   // ---------------------------------------------------------------------------
   async login(accountName: string, accountSecret: string): Promise<{ success: boolean; token?: string; error?: string }> {
     try {
+      // 1. First attempt RFC 8620 HTTP Basic Auth against JMAP /api/account
+      const plain = `${accountName}:${accountSecret}`;
+      const basicToken =
+        typeof window !== "undefined"
+          ? window.btoa(unescape(encodeURIComponent(plain)))
+          : Buffer.from(plain).toString("base64");
+      const fullBasicAuth = `Basic ${basicToken}`;
+
+      const jmapRes = await fetch(`${this.baseUrl}/jmap/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: fullBasicAuth,
+        },
+        body: JSON.stringify({
+          using: ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
+          methodCalls: [["Mailbox/get", { accountId: "self", ids: [] }, "0"]],
+        }),
+      });
+
+      if (jmapRes.ok) {
+        this.setToken(fullBasicAuth);
+        if (typeof window !== "undefined") {
+          localStorage.setItem("postarc_account", accountName);
+        }
+        return { success: true, token: fullBasicAuth };
+      }
+
+      if (jmapRes.status === 401 || jmapRes.status === 403) {
+        return { success: false, error: "Invalid username or password." };
+      }
+
+      // 2. If Basic Auth did not succeed, attempt OAuth authorization endpoint
       const res = await fetch(`${this.baseUrl}/api/auth`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -126,43 +164,61 @@ class PostarcClient {
           type: "authCode",
           accountName,
           accountSecret,
-          clientId: "postarc-web",
+          query: "response_type=code&client_id=postarc-web&scope=urn:ietf:params:jmap:core",
         }),
       });
 
       if (!res.ok) {
         const errData = await res.json().catch(() => null);
-        return { success: false, error: errData?.message || "Invalid account credentials or unauthorized." };
+        return {
+          success: false,
+          error:
+            errData?.description ||
+            errData?.message ||
+            "Invalid account credentials or unauthorized.",
+        };
       }
 
       const data = await res.json();
-      const clientCode = data.clientCode;
-      if (!clientCode) {
-        return { success: false, error: "Authentication challenge missing client authorization code." };
+      if (data.type === "authenticated" && data.location) {
+        const url = new URL(
+          data.location,
+          typeof window !== "undefined" ? window.location.origin : "http://localhost:3000"
+        );
+        const code = url.searchParams.get("code");
+        if (code) {
+          const tokenRes = await fetch(`${this.baseUrl}/auth/token`, {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({
+              grant_type: "authorization_code",
+              code,
+              client_id: "postarc-web",
+            }),
+          });
+          if (tokenRes.ok) {
+            const tokenData = await tokenRes.json();
+            const bearerToken = `Bearer ${tokenData.access_token}`;
+            this.setToken(bearerToken);
+            if (typeof window !== "undefined") {
+              localStorage.setItem("postarc_account", accountName);
+            }
+            return { success: true, token: bearerToken };
+          }
+        }
       }
 
-      const tokenRes = await fetch(`${this.baseUrl}/auth/token`, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-          grant_type: "authorization_code",
-          code: clientCode,
-          client_id: "postarc-web",
-        }),
-      });
-
-      if (!tokenRes.ok) {
-        return { success: false, error: "Failed to exchange authorization code for access token." };
-      }
-
-      const tokenData = await tokenRes.json();
-      this.setToken(tokenData.access_token);
-      if (typeof window !== "undefined") {
-        localStorage.setItem("postarc_account", accountName);
-      }
-      return { success: true, token: tokenData.access_token };
+      return {
+        success: false,
+        error: "Failed to establish authenticated session with Postarc Engine.",
+      };
     } catch (err: any) {
-      return { success: false, error: err.message || "Unable to reach Postarc Engine. Check connection." };
+      return {
+        success: false,
+        error:
+          err.message ||
+          `Unable to reach Postarc Engine at ${this.baseUrl || "localhost:8080"}.`,
+      };
     }
   }
 
