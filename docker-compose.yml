@@ -1,0 +1,89 @@
+version: "3.8"
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: postarc-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-postarc}
+      POSTGRES_USER: ${DB_USER:-postarc}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postarc_secret_pass}
+    volumes:
+      - postarc-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postarc} -d ${DB_NAME:-postarc}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: postarc-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - postarc-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  engine:
+    build:
+      context: ./engine
+      dockerfile: Dockerfile
+    container_name: postarc-engine
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "25:25"     # SMTP Inbound
+      - "465:465"   # SMTPS Outbound
+      - "587:587"   # SMTP Submission
+      - "143:143"   # IMAP STARTTLS
+      - "993:993"   # IMAPS
+      - "110:110"   # POP3
+      - "995:995"   # POP3S
+      - "4190:4190" # ManageSieve
+      - "8080:8080" # Internal HTTP / JMAP / REST API
+    environment:
+      POSTARC_HOSTNAME: ${HOSTNAME:-mail.example.com}
+      POSTARC_DB_URL: postgres://${DB_USER:-postarc}:${DB_PASSWORD:-postarc_secret_pass}@db:5432/${DB_NAME:-postarc}
+      POSTARC_REDIS_URL: redis://redis:6379
+      POSTARC_ADMIN_USER: ${ADMIN_USER:-admin@example.com}
+      POSTARC_ADMIN_PASSWORD: ${ADMIN_PASSWORD:-AdminSecret#2026}
+    volumes:
+      - postarc-engine-data:/var/lib/postarc
+      - postarc-engine-config:/etc/postarc
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/healthz/live"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    container_name: postarc-web
+    restart: unless-stopped
+    depends_on:
+      - engine
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_POSTARC_URL: http://engine:8080
+      POSTARC_INTERNAL_API_URL: http://engine:8080
+      NEXTAUTH_SECRET: ${SESSION_SECRET:-postarc_super_secret_session_key}
+      NODE_ENV: production
+
+volumes:
+  postarc-db-data:
+  postarc-redis-data:
+  postarc-engine-data:
+  postarc-engine-config:
