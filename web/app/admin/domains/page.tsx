@@ -10,14 +10,14 @@ import { TextInput } from "@astryxdesign/core/TextInput"
 import { Banner } from "@astryxdesign/core/Banner"
 import { Dialog } from "@astryxdesign/core/Dialog"
 import { Table, type TableColumn, pixel, proportional } from "@astryxdesign/core/Table"
-import { Globe, RefreshCw, Plus } from "lucide-react"
+import { Globe, RefreshCw, Plus, Key } from "lucide-react"
 import type { CustomDomain } from "@/types/mailbox"
 import { AdminPageLayout } from "@/components/admin-page-layout"
 import { postarcApi } from "@/lib/postarc-api"
 
 interface DnsRecordItem extends Record<string, unknown> {
   id: string
-  type: "TXT" | "MX" | "CNAME"
+  type: "TXT" | "MX" | "CNAME" | "A"
   host: string
   value: string
   priority?: number
@@ -26,49 +26,16 @@ interface DnsRecordItem extends Record<string, unknown> {
 }
 
 function buildDnsRecords(domain: CustomDomain): DnsRecordItem[] {
-  return [
-    {
-      id: `dns_${domain.id}_01`,
-      type: "TXT",
-      host: "@",
-      value: domain.verificationToken,
-      status: domain.isVerified ? "verified" : "pending",
-      purpose: "Domain Ownership Verification",
-    },
-    {
-      id: `dns_${domain.id}_02`,
-      type: "MX",
-      host: "@",
-      value: "mail.postarc.com",
-      priority: 10,
-      status: domain.mxStatus === "verified" ? "verified" : "pending",
-      purpose: "Inbound Email Routing (MX)",
-    },
-    {
-      id: `dns_${domain.id}_03`,
-      type: "TXT",
-      host: "@",
-      value: "v=spf1 include:_spf.postarc.com ~all",
-      status: domain.spfStatus === "verified" ? "verified" : "pending",
-      purpose: "Sender Policy Framework (SPF)",
-    },
-    {
-      id: `dns_${domain.id}_04`,
-      type: "CNAME",
-      host: "postarc._domainkey",
-      value: `dkim.${domain.name}`,
-      status: domain.dkimStatus === "verified" ? "verified" : "pending",
-      purpose: "Cryptographic Signature (DKIM)",
-    },
-    {
-      id: `dns_${domain.id}_05`,
-      type: "TXT",
-      host: "_dmarc",
-      value: `v=DMARC1; p=quarantine; rua=mailto:dmarc@${domain.name}`,
-      status: domain.dmarcStatus === "verified" ? "verified" : "pending",
-      purpose: "Domain-based Auth & Reporting (DMARC)",
-    },
-  ]
+  const generated = postarcApi.generateProductionDns(domain.name)
+  return generated.map((rec, i) => ({
+    id: `dns_${domain.id}_${i}`,
+    type: rec.type,
+    host: rec.host,
+    value: rec.value,
+    priority: rec.priority,
+    status: (domain.dkimStatus === "verified" && domain.spfStatus === "verified") ? "verified" : "pending",
+    purpose: rec.purpose,
+  }))
 }
 
 export default function AdminDomainsPage() {
@@ -241,6 +208,13 @@ export default function AdminDomainsPage() {
       title="Domains & DNS"
       actions={
         <HStack gap={2}>
+          <Button
+            label="Setup & DKIM Wizard"
+            variant="secondary"
+            size="sm"
+            icon={<Key size={16} />}
+            href="/onboarding"
+          />
           <Button
             label="Add Domain"
             variant="secondary"

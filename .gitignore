@@ -38,3 +38,10 @@ data/
 logs/
 *.log
 
+# DKIM Cryptographic Keys & Zone Artifacts
+engine/config/dkim/*.key
+engine/config/dkim/*.zone
+engine/config/dkim/*.json
+!engine/config/dkim/.gitkeep
+
+

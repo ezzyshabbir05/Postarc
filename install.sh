@@ -82,11 +82,24 @@ if command -v ufw &> /dev/null && ufw status | grep -q "Status: active"; then
     echo -e "${GREEN}Firewall ports configured.${NC}"
 fi
 
-# Step 4: Build & Start Containers
-echo -e "${YELLOW}[4/4] Starting Postarc containers with Docker Compose...${NC}"
-docker compose up -d --build
-
+# Step 4: Generate 2048-bit DKIM Keypair and DNS zone
+echo -e "${YELLOW}[4/5] Generating cryptographic keys (2048-bit RSA DKIM)...${NC}"
 SERVER_IP=$(hostname -I | awk '{print $1}')
+if command -v node &> /dev/null; then
+    node scripts/generate-keys.js "${DOMAIN}" "mail.${DOMAIN}" "${SERVER_IP}"
+else
+    # Native OpenSSL keygen fallback
+    mkdir -p engine/config/dkim
+    if [ ! -f "engine/config/dkim/${DOMAIN}.private.key" ]; then
+        openssl genrsa -out "engine/config/dkim/${DOMAIN}.private.key" 2048 2>/dev/null
+        openssl rsa -in "engine/config/dkim/${DOMAIN}.private.key" -pubout -out "engine/config/dkim/${DOMAIN}.public.key" 2>/dev/null
+        chmod 600 "engine/config/dkim/${DOMAIN}.private.key"
+    fi
+fi
+
+# Step 5: Build & Start Containers
+echo -e "${YELLOW}[5/5] Starting Postarc containers with Docker Compose...${NC}"
+docker compose up -d --build
 
 echo -e "${CYAN}"
 echo "=========================================================="
@@ -94,14 +107,24 @@ echo "          Postarc Successfully Deployed!                  "
 echo "=========================================================="
 echo -e "${NC}"
 echo -e "Webmail & Admin Console: ${GREEN}http://${SERVER_IP}:3000${NC}"
+echo -e "Onboarding Wizard:       ${GREEN}http://${SERVER_IP}:3000/onboarding${NC}"
 echo -e "Admin Username:          ${GREEN}$(grep ADMIN_USER .env | cut -d '=' -f2)${NC}"
 echo -e "Admin Password:          ${GREEN}$(grep ADMIN_PASSWORD .env | cut -d '=' -f2)${NC}"
 echo ""
 echo -e "${YELLOW}DNS Records to configure at your registrar:${NC}"
-echo -e "  MX:    @              mail.${DOMAIN}    (Priority 10)"
-echo -e "  A:     mail           ${SERVER_IP}"
-echo -e "  TXT:   @              \"v=spf1 mx ~all\""
-echo -e "  TXT:   _dmarc         \"v=DMARC1; p=quarantine; rua=mailto:dmarc@${DOMAIN}\""
+echo -e "  A:     mail                   ${SERVER_IP}"
+echo -e "  MX:    @                      mail.${DOMAIN}    (Priority 10)"
+echo -e "  TXT:   @                      \"v=spf1 mx ip4:${SERVER_IP} ~all\""
+if [ -f "engine/config/dkim/${DOMAIN}.public.key" ]; then
+    PUB_RAW=$(grep -v -- '-----' "engine/config/dkim/${DOMAIN}.public.key" | tr -d '\n')
+    echo -e "  TXT:   postarc._domainkey     \"v=DKIM1; k=rsa; p=${PUB_RAW}\""
+fi
+echo -e "  TXT:   _dmarc                 \"v=DMARC1; p=quarantine; rua=mailto:dmarc@${DOMAIN}; adkim=s; aspf=s\""
+echo -e "  TXT:   _mta-sts               \"v=STSv1; id=$(date +%Y%m%d%H%M%S)\""
+echo -e "  TXT:   _smtp._tls             \"v=TLSRPTv1; rua=mailto:tlsrpt@${DOMAIN}\""
 echo ""
+if [ -f "engine/config/dkim/${DOMAIN}.zone" ]; then
+    echo -e "BIND zone file saved to: ${GREEN}engine/config/dkim/${DOMAIN}.zone${NC}"
+fi
 echo "Manage containers with: docker compose [ps|logs|restart|stop]"
 

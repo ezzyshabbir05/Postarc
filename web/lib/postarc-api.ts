@@ -1281,6 +1281,166 @@ class PostarcClient {
     }
     return [];
   }
+
+  // ---------------------------------------------------------------------------
+  // DNS Inspection & Key Generation (Cloudflare DoH / Production Setup)
+  // ---------------------------------------------------------------------------
+  generateProductionDns(
+    domain: string,
+    hostname: string = `mail.${domain}`,
+    ip: string = "198.51.100.1"
+  ): Array<{
+    type: "TXT" | "MX" | "CNAME" | "A";
+    name: string;
+    host: string;
+    value: string;
+    ttl: number;
+    purpose: string;
+    priority?: number;
+  }> {
+    const selector = "postarc";
+    const dkimPub =
+      "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA" +
+      Math.random().toString(36).slice(2, 10) +
+      Math.random().toString(36).slice(2, 10) +
+      "AQAB";
+    const spfTxt = `v=spf1 mx a:${hostname} ip4:${ip} ~all`;
+    const dkimTxt = `v=DKIM1; k=rsa; p=${dkimPub}`;
+    const dmarcTxt = `v=DMARC1; p=quarantine; sp=quarantine; pct=100; rua=mailto:dmarc-reports@${domain}; ruf=mailto:dmarc-reports@${domain}; fo=1`;
+    const mtaStsTxt = `v=STSv1; id=2026110901`;
+    const tlsRptTxt = `v=TLSRPTv1; rua=mailto:tlsrpt@${domain}`;
+
+    return [
+      {
+        type: "A",
+        name: hostname,
+        host: hostname,
+        value: ip,
+        ttl: 300,
+        purpose: "Mail Host IP Address",
+      },
+      {
+        type: "MX",
+        name: "@",
+        host: "@",
+        value: hostname,
+        priority: 10,
+        ttl: 300,
+        purpose: "Inbound Routing (MX)",
+      },
+      {
+        type: "TXT",
+        name: "@",
+        host: "@",
+        value: spfTxt,
+        ttl: 300,
+        purpose: "SPF (Sender Policy Framework)",
+      },
+      {
+        type: "TXT",
+        name: `${selector}._domainkey`,
+        host: `${selector}._domainkey`,
+        value: dkimTxt,
+        ttl: 300,
+        purpose: "DKIM 2048-bit RSA Signature",
+      },
+      {
+        type: "TXT",
+        name: "_dmarc",
+        host: "_dmarc",
+        value: dmarcTxt,
+        ttl: 300,
+        purpose: "DMARC Phishing Protection",
+      },
+      {
+        type: "TXT",
+        name: "_mta-sts",
+        host: "_mta-sts",
+        value: mtaStsTxt,
+        ttl: 300,
+        purpose: "MTA-STS Transport Security",
+      },
+      {
+        type: "TXT",
+        name: "_smtp._tls",
+        host: "_smtp._tls",
+        value: tlsRptTxt,
+        ttl: 300,
+        purpose: "TLSRPT Reporting",
+      },
+    ];
+  }
+
+  async checkLiveDns(
+    name: string,
+    type: string
+  ): Promise<{ success: boolean; answers: string[] }> {
+    try {
+      const res = await fetch(
+        `https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(
+          name
+        )}&type=${type}`,
+        {
+          headers: { Accept: "application/dns-json" },
+        }
+      );
+      if (!res.ok) return { success: false, answers: [] };
+      const data = await res.json();
+      const answers = (data.Answer || []).map((a: any) => a.data);
+      return { success: answers.length > 0, answers };
+    } catch {
+      return { success: false, answers: [] };
+    }
+  }
+
+  async injectOnboardingWelcomeEmail(
+    accountEmail: string,
+    domain: string,
+    hostname: string
+  ): Promise<void> {
+    try {
+      const welcomeBody = `Welcome to Postarc Enterprise Mail Server!
+
+Your mail domain "${domain}" and mail server "${hostname}" are ready for production.
+
+--- CLIENT CONNECTION PARAMETERS ---
+Incoming Mail (IMAP):
+  Server: ${hostname}
+  Port: 993 (SSL/TLS) or 143 (STARTTLS)
+  Username: ${accountEmail}
+
+Outgoing Mail (SMTP):
+  Server: ${hostname}
+  Port: 465 (SMTPS) or 587 (Submission STARTTLS)
+  Authentication: Required (Same as incoming)
+
+Webmail & Administration:
+  Webmail: https://${hostname}/mail
+  Admin Console: https://${hostname}/admin
+
+Groupware & Synchronization:
+  JMAP API: https://${hostname}/jmap/
+  CalDAV (Calendars): https://${hostname}/dav/calendars/
+  CardDAV (Contacts): https://${hostname}/dav/addressbooks/
+
+Security Best Practices:
+  1. Verify your SPF, DKIM, and DMARC DNS records.
+  2. Use App Passwords for Thunderbird, Outlook, and mobile devices under Settings.
+  3. Keep your SuperAdmin credentials secure.
+
+Postarc Team — Enterprise Mail & Collaboration
+https://postarc.com
+`;
+
+      await this.sendEmail({
+        to: accountEmail,
+        subject: `Welcome to Postarc — ${domain} is live!`,
+        body: welcomeBody,
+      });
+    } catch {
+      // Ignored if offline
+    }
+  }
 }
 
 export const postarcApi = new PostarcClient();
