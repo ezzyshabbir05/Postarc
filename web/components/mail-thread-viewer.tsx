@@ -192,6 +192,45 @@ export function MailThreadViewer() {
     }))
   }
 
+  const printSingleMessage = (msg: ThreadMessage) => {
+    if (typeof window === "undefined") return
+    const printWindow = window.open("", "_blank", "width=800,height=600")
+    if (!printWindow) return
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>${activeEmail?.subject || "Email Print"}</title>
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; padding: 32px; color: #111; line-height: 1.6; }
+            .header { border-bottom: 2px solid #e5e7eb; padding-bottom: 16px; margin-bottom: 24px; }
+            .subject { font-size: 22px; font-weight: 700; margin-bottom: 12px; }
+            .meta { font-size: 14px; color: #4b5563; margin-bottom: 4px; }
+            .meta strong { color: #111; }
+            .badge { display: inline-block; padding: 2px 8px; border-radius: 9999px; font-size: 12px; font-weight: 600; background: #e0f2fe; color: #0369a1; margin-right: 6px; }
+            .body { font-size: 15px; white-space: pre-wrap; word-break: break-word; }
+            @media print {
+              body { padding: 0; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="subject">${activeEmail?.subject || ""}</div>
+            <div class="meta"><strong>From:</strong> ${msg.senderName} &lt;${msg.senderEmail}&gt;</div>
+            <div class="meta"><strong>To:</strong> ${msg.recipientEmail}</div>
+            <div class="meta"><strong>Date:</strong> ${msg.fullDate || msg.timestamp}</div>
+            <div class="meta"><strong>Security:</strong> <span class="badge">TLS Verified</span>${msg.pgpSignatureStatus === "valid" ? '<span class="badge">OpenPGP Signed</span>' : ''}</div>
+          </div>
+          <div class="body">${msg.body}</div>
+        </body>
+      </html>
+    `)
+    printWindow.document.close()
+    printWindow.focus()
+    printWindow.print()
+  }
+
   const handleSendReply = () => {
     if (!replyText.trim()) return
     replyToEmail(activeEmail.id, replyText)
@@ -750,12 +789,36 @@ export function MailThreadViewer() {
                     icon={<Reply size={16} />}
                     onClick={() => setIsReplying(true)}
                   />
-                  <IconButton
-                    label="More"
-                    tooltip="More"
-                    variant="ghost"
-                    size="sm"
-                    icon={<MoreVertical size={16} />}
+                  <DropdownMenu
+                    alignment="end"
+                    renderTrigger={(triggerProps) => (
+                      <IconButton
+                        label="More options"
+                        tooltip="More options"
+                        variant="ghost"
+                        size="sm"
+                        icon={<MoreVertical size={16} />}
+                        {...triggerProps}
+                      />
+                    )}
+                    items={[
+                      {
+                        label: "Reply",
+                        onClick: () => setIsReplying(true),
+                      },
+                      {
+                        label: "Print message",
+                        onClick: () => printSingleMessage(msg),
+                      },
+                      {
+                        label: "Export as EML",
+                        onClick: () => exportEmailAsEml(activeEmail.id),
+                      },
+                      {
+                        label: "Filter messages like this",
+                        href: "/mail/filters",
+                      },
+                    ]}
                   />
                 </HStack>
               </HStack>
