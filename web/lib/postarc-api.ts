@@ -120,6 +120,71 @@ class PostarcClient {
   }
 
   // ---------------------------------------------------------------------------
+  // JMAP WebSocket Real-Time Push (RFC 8887)
+  // ---------------------------------------------------------------------------
+  connectWebSocket(onStateChange: (change: any) => void): () => void {
+    if (typeof window === "undefined") return () => {};
+    const token = this.getToken();
+    if (!token) return () => {};
+
+    const loc = window.location;
+    const protocol = loc.protocol === "https:" ? "wss:" : "ws:";
+    const host = this.baseUrl
+      ? this.baseUrl.replace(/^https?:\/\//, "")
+      : loc.host;
+    const wsUrl = `${protocol}//${host}/jmap/ws`;
+
+    let ws: WebSocket | null = null;
+    let isClosed = false;
+    let reconnectTimer: any = null;
+
+    const connect = () => {
+      if (isClosed) return;
+      try {
+        ws = new WebSocket(wsUrl, ["jmap"]);
+
+        ws.onopen = () => {
+          ws?.send(
+            JSON.stringify({
+              "@type": "WebSocketPushEnable",
+              dataTypes: ["Email", "Mailbox"],
+            })
+          );
+        };
+
+        ws.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            onStateChange(data);
+          } catch {
+            // ignore non-json frames
+          }
+        };
+
+        ws.onclose = () => {
+          if (!isClosed) {
+            reconnectTimer = setTimeout(connect, 5000);
+          }
+        };
+
+        ws.onerror = () => {
+          ws?.close();
+        };
+      } catch {
+        // WebSocket not available or blocked, gracefully fallback
+      }
+    };
+
+    connect();
+
+    return () => {
+      isClosed = true;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      ws?.close();
+    };
+  }
+
+  // ---------------------------------------------------------------------------
   // Authentication & Session (RFC 8620 Basic Auth & OAuth2)
   // ---------------------------------------------------------------------------
   async login(accountName: string, accountSecret: string): Promise<{ success: boolean; token?: string; error?: string }> {

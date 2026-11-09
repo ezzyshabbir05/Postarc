@@ -203,21 +203,54 @@ export function MailProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
-  // ── Live Email Fetch on Folder Change ─────────────────────────────────────
+  // ── Live Email Fetch on Folder Change & WebSocket Live Push ───────────────
   useEffect(() => {
     let isMounted = true
-    postarcApi
-      .getEmails(activeFolder)
-      .then((liveEmails) => {
-        if (isMounted) {
-          setEmails(liveEmails)
-        }
-      })
-      .catch(() => {
-        if (isMounted) setEmails([])
-      })
+    const fetchEmails = () => {
+      postarcApi
+        .getEmails(activeFolder)
+        .then((liveEmails) => {
+          if (isMounted) {
+            setEmails(liveEmails)
+          }
+        })
+        .catch(() => {
+          if (isMounted) setEmails([])
+        })
+    }
+
+    fetchEmails()
+
+    // Real-Time JMAP WebSocket Push (RFC 8887)
+    const disconnectWs = postarcApi.connectWebSocket((change) => {
+      if (!isMounted) return
+      fetchEmails()
+      postarcApi
+        .getMailboxes()
+        .then((mboxes) => {
+          if (!isMounted || mboxes.length === 0) return
+          const custom: CustomMailboxFolder[] = mboxes
+            .filter((m) => !m.role)
+            .map((m) => ({
+              id: m.id,
+              name: m.name,
+              totalCount: m.totalEmails,
+              unreadCount: m.unreadEmails,
+            }))
+          setCustomFolders(custom)
+        })
+        .catch(() => {})
+      postarcApi
+        .getStorageQuota()
+        .then((q) => {
+          if (isMounted && q) setQuotaInfo(q)
+        })
+        .catch(() => {})
+    })
+
     return () => {
       isMounted = false
+      disconnectWs()
     }
   }, [activeFolder])
 
