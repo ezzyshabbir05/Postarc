@@ -19,6 +19,15 @@ import {
   UserCheck,
   ChevronDown,
   ShieldCheck,
+  Bold,
+  Italic,
+  Underline,
+  List,
+  ListOrdered,
+  Code,
+  Link2,
+  Quote,
+  Eye,
 } from "lucide-react"
 import { useMail } from "@/components/mail-context"
 import { getAttachmentIcon } from "@/components/attachment-badge"
@@ -51,6 +60,16 @@ export function MailComposer() {
   const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState(false)
   const [isIdentitySelectorOpen, setIsIdentitySelectorOpen] = useState(false)
   const [isPgpSignEnabled, setIsPgpSignEnabled] = useState(false)
+  const [isPreviewMode, setIsPreviewMode] = useState(false)
+
+  const formatBody = (prefix: string, suffix: string = "") => {
+    setBody((prev) => `${prev} ${prefix}text${suffix}`)
+  }
+
+  const formatList = (type: "bullet" | "number") => {
+    const symbol = type === "bullet" ? "- " : "1. "
+    setBody((prev) => `${prev}\n${symbol}`)
+  }
 
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -313,14 +332,110 @@ export function MailComposer() {
             onChange={(val) => setSubject(val)}
           />
 
-          {/* Body TextArea */}
-          <TextArea
-            label="Message Body"
-            placeholder="Write your email here..."
-            value={body}
-            onChange={(val) => setBody(val)}
-            rows={10}
-          />
+          {/* Formatting Controls Bar */}
+          <HStack gap={1} vAlign="center" wrap="wrap">
+            <IconButton
+              variant="ghost"
+              size="sm"
+              icon={<Bold size={14} />}
+              label="Bold"
+              onClick={() => formatBody("**", "**")}
+            />
+            <IconButton
+              variant="ghost"
+              size="sm"
+              icon={<Italic size={14} />}
+              label="Italic"
+              onClick={() => formatBody("*", "*")}
+            />
+            <IconButton
+              variant="ghost"
+              size="sm"
+              icon={<Underline size={14} />}
+              label="Underline"
+              onClick={() => formatBody("<u>", "</u>")}
+            />
+            <IconButton
+              variant="ghost"
+              size="sm"
+              icon={<Code size={14} />}
+              label="Code"
+              onClick={() => formatBody("`", "`")}
+            />
+            <IconButton
+              variant="ghost"
+              size="sm"
+              icon={<List size={14} />}
+              label="Bullet List"
+              onClick={() => formatList("bullet")}
+            />
+            <IconButton
+              variant="ghost"
+              size="sm"
+              icon={<ListOrdered size={14} />}
+              label="Numbered List"
+              onClick={() => formatList("number")}
+            />
+            <IconButton
+              variant="ghost"
+              size="sm"
+              icon={<Quote size={14} />}
+              label="Quote"
+              onClick={() => formatBody("> ")}
+            />
+            <IconButton
+              variant="ghost"
+              size="sm"
+              icon={<Link2 size={14} />}
+              label="Insert Link"
+              onClick={() => formatBody("[Link Text](https://example.com)")}
+            />
+            <Button
+              variant="ghost"
+              size="sm"
+              icon={<FileText size={14} />}
+              label="Templates"
+              onClick={() => setIsTemplateDialogOpen(true)}
+            />
+            <Button
+              variant={isPreviewMode ? "primary" : "ghost"}
+              size="sm"
+              icon={<Eye size={14} />}
+              label={isPreviewMode ? "Editing" : "Preview"}
+              onClick={() => setIsPreviewMode(!isPreviewMode)}
+            />
+          </HStack>
+
+          {/* Body TextArea / Live Preview */}
+          {isPreviewMode ? (
+            <Card padding={4} variant="muted" width="100%">
+              <VStack gap={2} width="100%">
+                <Text type="supporting" size="xsm" color="secondary">
+                  HTML Message Preview:
+                </Text>
+                <VStack gap={1} width="100%">
+                  {body.split("\n\n").map((para, idx) => (
+                    <Text key={idx} type="body" size="base">
+                      {para}
+                    </Text>
+                  ))}
+                  {!body && (
+                    <Text type="supporting" color="disabled">
+                      (No content)
+                    </Text>
+                  )}
+                </VStack>
+              </VStack>
+            </Card>
+          ) : (
+            <TextArea
+              label="Message Body"
+              placeholder="Write your email here..."
+              value={body}
+              onChange={(val) => setBody(val)}
+              rows={10}
+            />
+          )}
 
           {/* Attachments Section */}
           {attachments.length > 0 && (
