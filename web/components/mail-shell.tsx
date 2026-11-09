@@ -136,6 +136,7 @@ function MailTopNav({ user: initialUser }: MailTopNavProps) {
             )}
             items={[
               { label: "Settings", href: "/mail/settings" },
+              { label: "Mail Filters (Sieve)", href: "/mail/filters" },
               {
                 label: mode === "dark" ? "Light theme" : "Dark theme",
                 onClick: toggleTheme,

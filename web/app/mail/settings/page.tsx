@@ -420,6 +420,24 @@ export default function MailboxSettingsPage() {
         </VStack>
       </Card>
 
+      {/* ── Section: Incoming Mail Filters (ManageSieve) ── */}
+      <Card padding={6} width="100%">
+        <HStack hAlign="between" vAlign="center" width="100%">
+          <VStack gap={1}>
+            <Heading level={3}>Incoming Mail Filtering Rules</Heading>
+            <Text type="body" color="secondary" size="sm">
+              Manage automated server-side Sieve scripts (RFC 5228) to sort, forward, or discard incoming emails.
+            </Text>
+          </VStack>
+          <Button
+            label="Configure Rules"
+            variant="secondary"
+            size="md"
+            href="/mail/filters"
+          />
+        </HStack>
+      </Card>
+
       {/* ── Dialog: Generate App Password ── */}
       <Dialog
         isOpen={isCreateModalOpen}
