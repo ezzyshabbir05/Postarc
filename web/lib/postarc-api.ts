@@ -48,6 +48,17 @@ export interface VacationResponseConfig {
   textBody: string;
 }
 
+export interface PostarcCalendarEvent {
+  id: string;
+  title: string;
+  start: string;
+  end: string;
+  allDay?: boolean;
+  category: "Work" | "Personal" | "Meeting" | "Important";
+  location?: string;
+  description?: string;
+}
+
 export interface QuotaInfo {
   usedBytes: number;
   totalBytes: number;
@@ -708,6 +719,135 @@ class PostarcClient {
       ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:contacts"],
       [["Card/set", { accountId: "self", destroy: [id] }, "0"]]
     );
+  }
+
+  // ---------------------------------------------------------------------------
+  // CalDAV & JMAP Calendars (RFC 8984 / CalDAV Groupware)
+  // ---------------------------------------------------------------------------
+  async getCalendarEvents(): Promise<PostarcCalendarEvent[]> {
+    try {
+      const data = await this.jmapCall(
+        ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:calendars"],
+        [
+          ["CalendarEvent/query", { accountId: "self", limit: 200 }, "0"],
+          [
+            "CalendarEvent/get",
+            {
+              accountId: "self",
+              "#ids": {
+                resultOf: "0",
+                name: "CalendarEvent/query",
+                path: "/ids",
+              },
+            },
+            "1",
+          ],
+        ]
+      );
+      const list = data.methodResponses?.[1]?.[1]?.list || [];
+      return list.map((e: any) => ({
+        id: e.id,
+        title: e.title || e.summary || "Event",
+        start: e.start,
+        end: e.end,
+        allDay: e.isAllDay ?? false,
+        category: (e.keywords?.[0] as any) || "Meeting",
+        location: e.locations ? Object.values(e.locations)[0] : e.location,
+        description: e.description,
+      }));
+    } catch {
+      if (typeof window === "undefined") return [];
+      try {
+        const raw = localStorage.getItem("postarc_calendar_events");
+        return raw ? JSON.parse(raw) : [];
+      } catch {
+        return [];
+      }
+    }
+  }
+
+  async createCalendarEvent(
+    event: Omit<PostarcCalendarEvent, "id">
+  ): Promise<PostarcCalendarEvent> {
+    const id = `evt_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const newEvent: PostarcCalendarEvent = { id, ...event };
+
+    try {
+      await this.jmapCall(
+        ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:calendars"],
+        [
+          [
+            "CalendarEvent/set",
+            {
+              accountId: "self",
+              create: {
+                newEvent: {
+                  title: event.title,
+                  start: event.start,
+                  end: event.end,
+                  isAllDay: event.allDay,
+                  keywords: event.category ? [event.category] : ["Meeting"],
+                  description: event.description,
+                },
+              },
+            },
+            "0",
+          ],
+        ]
+      );
+    } catch {
+      // Local fallback
+      if (typeof window !== "undefined") {
+        const current = await this.getCalendarEvents();
+        current.push(newEvent);
+        localStorage.setItem("postarc_calendar_events", JSON.stringify(current));
+      }
+    }
+    return newEvent;
+  }
+
+  async deleteCalendarEvent(id: string): Promise<void> {
+    try {
+      await this.jmapCall(
+        ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:calendars"],
+        [["CalendarEvent/set", { accountId: "self", destroy: [id] }, "0"]]
+      );
+    } catch {
+      if (typeof window !== "undefined") {
+        const current = (await this.getCalendarEvents()).filter(
+          (e) => e.id !== id
+        );
+        localStorage.setItem("postarc_calendar_events", JSON.stringify(current));
+      }
+    }
+  }
+
+  exportIcs(events: PostarcCalendarEvent[]): string {
+    const lines = [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//Postarc Platform//Postarc Calendar 1.0//EN",
+      "CALSCALE:GREGORIAN",
+      "METHOD:PUBLISH",
+    ];
+
+    for (const ev of events) {
+      const dtStart = ev.start.replace(/[-:]/g, "").split(".")[0] + "Z";
+      const dtEnd = ev.end.replace(/[-:]/g, "").split(".")[0] + "Z";
+      lines.push("BEGIN:VEVENT");
+      lines.push(`UID:${ev.id}@postarc.local`);
+      lines.push(`DTSTAMP:${dtStart}`);
+      lines.push(`DTSTART:${dtStart}`);
+      lines.push(`DTEND:${dtEnd}`);
+      lines.push(`SUMMARY:${ev.title}`);
+      if (ev.description) lines.push(`DESCRIPTION:${ev.description}`);
+      if (ev.location) lines.push(`LOCATION:${ev.location}`);
+      if (ev.category) lines.push(`CATEGORIES:${ev.category}`);
+      lines.push("END:VEVENT");
+    }
+
+    lines.push("END:VCALENDAR");
+    return lines.join("\r\n");
   }
 
   // ---------------------------------------------------------------------------

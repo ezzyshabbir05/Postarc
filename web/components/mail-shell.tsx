@@ -31,6 +31,7 @@ import {
   Folder,
   Plus,
   Users,
+  Calendar,
 } from "lucide-react"
 import type { MailboxUser } from "@/types/mailbox"
 import { useMail } from "@/components/mail-context"
@@ -85,6 +86,13 @@ function MailTopNav({ user: initialUser }: MailTopNavProps) {
       }
       endContent={
         <HStack gap={3} vAlign="center">
+          <Button
+            label="Calendar"
+            variant="ghost"
+            size="sm"
+            icon={<Calendar size={16} />}
+            href="/mail/calendar"
+          />
           <Button
             label="Contacts"
             variant="ghost"
