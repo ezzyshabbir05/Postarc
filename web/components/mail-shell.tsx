@@ -203,11 +203,6 @@ function MailSideNav({ user }: MailSideNavProps) {
     setSearchQuery("")
   }
 
-  const handleSelectLabel = (label: string) => {
-    setActiveFolder("inbox")
-    closeEmail()
-    setSearchQuery(label)
-  }
 
   const handleCreateFolder = () => {
     if (!newFolderName.trim()) return
@@ -239,7 +234,7 @@ function MailSideNav({ user }: MailSideNavProps) {
         <VStack gap={1} width="100%" padding={2}>
           <HStack hAlign="between" vAlign="center">
             <Text type="supporting" color="secondary" size="xsm">
-              Personal Mailbox
+              {email || "Storage"}
             </Text>
             <Text
               type="supporting"
@@ -341,37 +336,6 @@ function MailSideNav({ user }: MailSideNavProps) {
         />
       </SideNavSection>
 
-      {/* ── Labels ── */}
-      <SideNavSection title="Labels">
-        <SideNavItem
-          label="Clients"
-          icon={<Tag size={18} className="text-blue-500" />}
-          isSelected={false}
-          href="/mail"
-          onClick={() => handleSelectLabel("Clients")}
-        />
-        <SideNavItem
-          label="Invoices"
-          icon={<Tag size={18} className="text-emerald-500" />}
-          isSelected={false}
-          href="/mail"
-          onClick={() => handleSelectLabel("Invoices")}
-        />
-        <SideNavItem
-          label="Personal"
-          icon={<Tag size={18} className="text-purple-500" />}
-          isSelected={false}
-          href="/mail"
-          onClick={() => handleSelectLabel("Personal")}
-        />
-        <SideNavItem
-          label="Work"
-          icon={<Tag size={18} className="text-amber-500" />}
-          isSelected={false}
-          href="/mail"
-          onClick={() => handleSelectLabel("Work")}
-        />
-      </SideNavSection>
 
       {/* ── Custom Folders (Roundcube Suite) ── */}
       <SideNavSection

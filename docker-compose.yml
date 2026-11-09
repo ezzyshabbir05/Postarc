@@ -60,10 +60,11 @@ services:
       POSTARC_ADMIN_USER: ${ADMIN_USER:-admin@example.com}
       POSTARC_ADMIN_PASSWORD: ${ADMIN_PASSWORD:-AdminSecret#2026}
     volumes:
-      - postarc-engine-data:/var/lib/postarc
+      - postarc-engine-data:/opt/stalwart-mail/data
+      - ./engine/config/postarc.toml:/opt/stalwart-mail/etc/config.toml:ro
       - ./engine/config/postarc.toml:/etc/postarc/postarc.toml:ro
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/healthz/live"]
+      test: ["CMD-SHELL", "/usr/local/bin/stalwart-mail --version || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 3

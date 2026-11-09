@@ -63,7 +63,12 @@ export function MailList() {
     }
 
     if (activeFolder === "inbox") {
-      return email.folder === "inbox" && email.category === activeCategory
+      return (
+        email.folder === "inbox" &&
+        (activeCategory === "primary"
+          ? !email.category || email.category === "primary"
+          : email.category === activeCategory)
+      )
     }
 
     return email.folder === activeFolder
