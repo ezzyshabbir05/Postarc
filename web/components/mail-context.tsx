@@ -1,6 +1,6 @@
 "use client"
 
-import React, { createContext, useContext, useState, useMemo } from "react"
+import React, { createContext, useContext, useState, useMemo, useEffect } from "react"
 import { useToast } from "@astryxdesign/core/Toast"
 import { Button } from "@astryxdesign/core/Button"
 import type { EmailThread, EmailCategory, EmailFolder, EmailAttachment, ThreadMessage, CustomMailboxFolder } from "@/types/email"
@@ -122,6 +122,30 @@ export function MailProvider({ children }: { children: React.ReactNode }) {
     { id: "cf_projects", name: "Strategic Projects", totalCount: 14, unreadCount: 2, color: "#3B82F6" },
     { id: "cf_receipts", name: "Invoices & Receipts", totalCount: 28, unreadCount: 0, color: "#10B981" },
   ])
+
+  // Live JMAP Sync: query engine whenever active folder changes
+  useEffect(() => {
+    let isMounted = true
+    postarcApi
+      .getEmails(activeFolder)
+      .then((liveEmails) => {
+        if (isMounted && liveEmails && liveEmails.length > 0) {
+          setEmails((prev) => {
+            const liveIds = new Set(liveEmails.map((e) => e.id))
+            const localOnly = prev.filter(
+              (e) => !liveIds.has(e.id) && (e.folder === "sent" || e.folder === "drafts" || e.id.startsWith("imported_"))
+            )
+            return [...liveEmails, ...localOnly]
+          })
+        }
+      })
+      .catch(() => {
+        // Gracefully keep current state in preview / offline mode
+      })
+    return () => {
+      isMounted = false
+    }
+  }, [activeFolder])
 
   const showToast = useToast()
 

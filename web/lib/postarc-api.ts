@@ -63,8 +63,8 @@ class PostarcClient {
   constructor() {
     this.baseUrl =
       typeof window !== "undefined"
-        ? process.env.NEXT_PUBLIC_POSTARC_URL || "http://localhost:8080"
-        : process.env.POSTARC_INTERNAL_API_URL || "http://localhost:8080";
+        ? (process.env.NEXT_PUBLIC_POSTARC_URL || "")
+        : (process.env.POSTARC_INTERNAL_API_URL || "http://localhost:8080");
   }
 
   setToken(token: string) {

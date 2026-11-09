@@ -77,7 +77,7 @@ services:
     ports:
       - "3000:3000"
     environment:
-      NEXT_PUBLIC_POSTARC_URL: http://engine:8080
+      NEXT_PUBLIC_POSTARC_URL: ""
       POSTARC_INTERNAL_API_URL: http://engine:8080
       NEXTAUTH_SECRET: ${SESSION_SECRET:-postarc_super_secret_session_key}
       NODE_ENV: production

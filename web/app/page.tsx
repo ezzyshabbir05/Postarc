@@ -12,6 +12,7 @@ import { Button } from "@astryxdesign/core/Button"
 import { Link } from "@astryxdesign/core/Link"
 import { Banner } from "@astryxdesign/core/Banner"
 import { ShieldCheck, Mail } from "lucide-react"
+import { postarcApi } from "@/lib/postarc-api"
 
 const containerStyle: CSSProperties = {
   position: "relative",
@@ -32,7 +33,7 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState("")
 
-  const handleSubmit = (e?: FormEvent) => {
+  const handleSubmit = async (e?: FormEvent) => {
     if (e) e.preventDefault()
     if (!username.trim() || !password) {
       setErrorMessage("Please enter both username and password.")
@@ -41,8 +42,14 @@ export default function LoginPage() {
     setErrorMessage("")
     setIsLoading(true)
 
-    setTimeout(() => {
-      setIsLoading(false)
+    try {
+      const res = await postarcApi.login(username.trim(), password)
+      if (!res.success) {
+        setErrorMessage(res.error || "Invalid username or password.")
+        setIsLoading(false)
+        return
+      }
+
       const user = username.toLowerCase().trim()
       // RBAC role-based routing
       if (user.startsWith("admin") || user.includes("owner")) {
@@ -50,7 +57,11 @@ export default function LoginPage() {
       } else {
         router.push("/mail")
       }
-    }, 400)
+    } catch {
+      setErrorMessage("Unable to connect to authentication server.")
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const fillDemoUser = (user: string, pass: string) => {
