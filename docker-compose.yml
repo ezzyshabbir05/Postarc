@@ -11,6 +11,7 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD:-postarc_secret_pass}
     volumes:
       - postarc-db-data:/var/lib/postgresql/data
+      - ./engine/bootstrap/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postarc} -d ${DB_NAME:-postarc}"]
       interval: 10s
@@ -59,7 +60,7 @@ services:
       POSTARC_ADMIN_PASSWORD: ${ADMIN_PASSWORD:-AdminSecret#2026}
     volumes:
       - postarc-engine-data:/var/lib/postarc
-      - postarc-engine-config:/etc/postarc
+      - ./engine/config/postarc.toml:/etc/postarc/postarc.toml:ro
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/healthz/live"]
       interval: 15s
@@ -86,5 +87,4 @@ volumes:
   postarc-db-data:
   postarc-redis-data:
   postarc-engine-data:
-  postarc-engine-config:
 

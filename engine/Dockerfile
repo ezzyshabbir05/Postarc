@@ -34,6 +34,7 @@ RUN export DEBIAN_FRONTEND=noninteractive && \
     mkdir -p /etc/postarc /var/lib/postarc && \
     chown postarc:postarc /etc/postarc /var/lib/postarc
 COPY --from=builder --chmod=0755 /output/postarc /usr/local/bin/postarc
+COPY --chown=postarc:postarc config/postarc.toml /etc/postarc/postarc.toml
 RUN setcap 'cap_net_bind_service=+ep' /usr/local/bin/postarc
 USER postarc
 WORKDIR /var/lib/postarc
