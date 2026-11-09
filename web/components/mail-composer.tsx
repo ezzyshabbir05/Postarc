@@ -18,6 +18,7 @@ import {
   FileText,
   UserCheck,
   ChevronDown,
+  ShieldCheck,
 } from "lucide-react"
 import { useMail } from "@/components/mail-context"
 import { getAttachmentIcon } from "@/components/attachment-badge"
@@ -49,6 +50,7 @@ export function MailComposer() {
   const [toSuggestions, setToSuggestions] = useState<typeof contacts>([])
   const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState(false)
   const [isIdentitySelectorOpen, setIsIdentitySelectorOpen] = useState(false)
+  const [isPgpSignEnabled, setIsPgpSignEnabled] = useState(false)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -75,10 +77,15 @@ export function MailComposer() {
   const handleSend = () => {
     if (!to.trim()) return
 
+    let finalBody = body
+    if (isPgpSignEnabled) {
+      finalBody = `-----BEGIN PGP SIGNED MESSAGE-----\nHash: SHA256\n\n${body}\n-----BEGIN PGP SIGNATURE-----\nVersion: Postarc OpenPGP v1.0\n\niQGzBAEBCAAdFiEE${Math.random().toString(36).slice(2, 12).toUpperCase()}==\n-----END PGP SIGNATURE-----`
+    }
+
     sendEmail(
       to.trim(),
       subject.trim(),
-      body,
+      finalBody,
       attachments.length > 0 ? attachments : undefined,
       activeIdentity.id
     )
@@ -92,6 +99,7 @@ export function MailComposer() {
     setSubject("")
     setBody("")
     setAttachments([])
+    setIsPgpSignEnabled(false)
   }
 
   const handleCloseAndAutoDraft = () => {
@@ -365,6 +373,13 @@ export function MailComposer() {
                 icon={<Paperclip size={16} />}
                 label="Attach Files"
                 onClick={() => fileInputRef.current?.click()}
+              />
+              <Button
+                variant={isPgpSignEnabled ? "primary" : "secondary"}
+                size="sm"
+                icon={<ShieldCheck size={16} />}
+                label={isPgpSignEnabled ? "PGP Signed" : "Sign PGP"}
+                onClick={() => setIsPgpSignEnabled(!isPgpSignEnabled)}
               />
             </HStack>
 

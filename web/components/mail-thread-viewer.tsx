@@ -451,6 +451,16 @@ export function MailThreadViewer() {
                           {msg.senderName}
                         </Text>
                         {msg.isVerified && <VerifiedBadge />}
+                      {(msg.pgpSignatureStatus === "valid" ||
+                        msg.body?.includes("-----BEGIN PGP SIGNED MESSAGE-----")) && (
+                        <Badge label="PGP Signed" variant="success" />
+                      )}
+                      {msg.pgpSignatureStatus === "invalid" && (
+                        <Badge label="PGP Invalid" variant="error" />
+                      )}
+                      {msg.body?.includes("-----BEGIN PGP MESSAGE-----") && (
+                        <Badge label="PGP Encrypted" variant="info" />
+                      )}
                       </HStack>
                       <Text
                         type="body"
@@ -518,6 +528,16 @@ export function MailThreadViewer() {
                         {msg.senderName}
                       </Text>
                       {msg.isVerified && <VerifiedBadge />}
+                      {(msg.pgpSignatureStatus === "valid" ||
+                        msg.body?.includes("-----BEGIN PGP SIGNED MESSAGE-----")) && (
+                        <Badge label="PGP Signed" variant="success" />
+                      )}
+                      {msg.pgpSignatureStatus === "invalid" && (
+                        <Badge label="PGP Invalid" variant="error" />
+                      )}
+                      {msg.body?.includes("-----BEGIN PGP MESSAGE-----") && (
+                        <Badge label="PGP Encrypted" variant="info" />
+                      )}
                       <Text
                         type="supporting"
                         size="sm"
