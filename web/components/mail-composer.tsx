@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef } from "react"
-import { Dialog } from "@astryxdesign/core/Dialog"
+import { Dialog, DialogHeader } from "@astryxdesign/core/Dialog"
 import { VStack, HStack } from "@astryxdesign/core/Layout"
 import { Heading, Text } from "@astryxdesign/core/Text"
 import { TextInput } from "@astryxdesign/core/TextInput"
@@ -153,26 +153,27 @@ export function MailComposer() {
     <>
       <Dialog
         isOpen={isComposeOpen}
-        onClose={handleCloseAndAutoDraft}
-        size="lg"
-        title={
-          <HStack gap={2} vAlign="center" justify="space-between" width="100%">
+        onOpenChange={(open) => {
+          if (!open) handleCloseAndAutoDraft()
+        }}
+        width={640}
+      >
+        <VStack gap={4} hAlign="stretch" padding={4}>
+          <HStack gap={2} vAlign="center" hAlign="between" width="100%">
             <HStack gap={2} vAlign="center">
               <Heading level={4}>New Message</Heading>
-              <Badge variant="outline" count={0}>
-                Draft
-              </Badge>
+              <Badge variant="neutral" label="Draft" />
             </HStack>
             <HStack gap={1} vAlign="center">
               <IconButton
-                aria-label="Discard draft"
+                label="Discard draft"
                 icon={<Trash2 size={16} />}
                 variant="ghost"
                 size="sm"
                 onClick={handleDiscard}
               />
               <IconButton
-                aria-label="Close"
+                label="Close"
                 icon={<X size={16} />}
                 variant="ghost"
                 size="sm"
@@ -180,17 +181,15 @@ export function MailComposer() {
               />
             </HStack>
           </HStack>
-        }
-      >
-        <VStack gap={4} hAlign="stretch">
+
           {/* Identity (From) Selector */}
-          <HStack gap={3} vAlign="center" justify="space-between">
+          <HStack gap={3} vAlign="center" hAlign="between">
             <HStack gap={2} vAlign="center">
               <Text type="body" weight="medium" color="secondary">
                 From:
               </Text>
               <Button
-                variant="outline"
+                variant="secondary"
                 size="sm"
                 label={`${activeIdentity.name} <${activeIdentity.email}>`}
                 icon={<ChevronDown size={14} />}
@@ -210,7 +209,7 @@ export function MailComposer() {
 
           {/* Identity Selection Dropdown List */}
           {isIdentitySelectorOpen && (
-            <Card padding={2} elevation="medium">
+            <Card padding={2} elevation="med">
               <VStack gap={1} hAlign="stretch">
                 {identities.map((idItem) => (
                   <Button
@@ -235,7 +234,7 @@ export function MailComposer() {
                 label="To"
                 placeholder="recipient@example.com"
                 value={to}
-                onChange={(e) => handleToChange(e.target.value)}
+                onChange={(val) => handleToChange(val)}
               />
               <HStack gap={1}>
                 {!showCc && (
@@ -261,7 +260,7 @@ export function MailComposer() {
             {toSuggestions.length > 0 && (
               <Card padding={2} elevation="high">
                 <VStack gap={1} hAlign="stretch">
-                  <Text type="supporting" color="secondary" size="xs">
+                  <Text type="supporting" color="secondary" size="xsm">
                     Contacts suggestion:
                   </Text>
                   {toSuggestions.map((c) => (
@@ -285,7 +284,7 @@ export function MailComposer() {
               label="Cc"
               placeholder="cc@example.com"
               value={cc}
-              onChange={(e) => setCc(e.target.value)}
+              onChange={(val) => setCc(val)}
             />
           )}
 
@@ -294,7 +293,7 @@ export function MailComposer() {
               label="Bcc"
               placeholder="bcc@example.com"
               value={bcc}
-              onChange={(e) => setBcc(e.target.value)}
+              onChange={(val) => setBcc(val)}
             />
           )}
 
@@ -303,7 +302,7 @@ export function MailComposer() {
             label="Subject"
             placeholder="Email subject"
             value={subject}
-            onChange={(e) => setSubject(e.target.value)}
+            onChange={(val) => setSubject(val)}
           />
 
           {/* Body TextArea */}
@@ -311,17 +310,17 @@ export function MailComposer() {
             label="Message Body"
             placeholder="Write your email here..."
             value={body}
-            onChange={(e) => setBody(e.target.value)}
+            onChange={(val) => setBody(val)}
             rows={10}
           />
 
           {/* Attachments Section */}
           {attachments.length > 0 && (
             <VStack gap={2} hAlign="stretch">
-              <Text type="supporting" color="secondary" size="xs">
+              <Text type="supporting" color="secondary" size="xsm">
                 Attachments ({attachments.length}):
               </Text>
-              <HStack gap={2} wrap>
+              <HStack gap={2} wrap="wrap">
                 {attachments.map((att) => (
                   <Card key={att.id} padding={2} elevation="low">
                     <HStack gap={2} vAlign="center">
@@ -330,15 +329,15 @@ export function MailComposer() {
                         <Text type="body" size="sm" weight="medium">
                           {att.name}
                         </Text>
-                        <Text type="supporting" color="secondary" size="xs">
+                        <Text type="supporting" color="secondary" size="xsm">
                           {att.size}
                         </Text>
                       </VStack>
                       <IconButton
-                        aria-label="Remove attachment"
+                        label="Remove attachment"
                         icon={<X size={14} />}
                         variant="ghost"
-                        size="xs"
+                        size="sm"
                         onClick={() => removeAttachment(att.id)}
                       />
                     </HStack>
@@ -358,10 +357,10 @@ export function MailComposer() {
           />
 
           {/* Bottom Actions Bar */}
-          <HStack justify="space-between" vAlign="center">
+          <HStack hAlign="between" vAlign="center">
             <HStack gap={2} vAlign="center">
               <Button
-                variant="outline"
+                variant="secondary"
                 size="sm"
                 icon={<Paperclip size={16} />}
                 label="Attach Files"
@@ -382,7 +381,7 @@ export function MailComposer() {
                 size="md"
                 icon={<Send size={16} />}
                 onClick={handleSend}
-                disabled={!to.trim()}
+                isDisabled={!to.trim()}
               />
             </HStack>
           </HStack>
@@ -392,29 +391,30 @@ export function MailComposer() {
       {/* Canned Responses / Template Dialog */}
       <Dialog
         isOpen={isTemplateDialogOpen}
-        onClose={() => setIsTemplateDialogOpen(false)}
-        size="md"
-        title="Insert Canned Response Template"
+        onOpenChange={setIsTemplateDialogOpen}
+        width={560}
       >
-        <VStack gap={3} hAlign="stretch">
+        <VStack gap={3} hAlign="stretch" padding={4}>
+          <DialogHeader
+            title="Insert Canned Response Template"
+            onOpenChange={setIsTemplateDialogOpen}
+          />
           <Text type="body" color="secondary" size="sm">
             Select a pre-configured template snippet to insert into your message:
           </Text>
           {cannedResponses.map((cr) => (
             <Card key={cr.id} padding={3} elevation="low">
               <VStack gap={2} hAlign="stretch">
-                <HStack justify="space-between" vAlign="center">
+                <HStack hAlign="between" vAlign="center">
                   <Text type="body" weight="bold">
                     {cr.title}
                   </Text>
-                  <Badge variant="outline" count={0}>
-                    {cr.category || "General"}
-                  </Badge>
+                  <Badge variant="neutral" label={cr.category || "General"} />
                 </HStack>
-                <Text type="supporting" color="secondary" size="xs">
+                <Text type="supporting" color="secondary" size="xsm">
                   {cr.body.slice(0, 120)}...
                 </Text>
-                <HStack justify="flex-end">
+                <HStack hAlign="end">
                   <Button
                     label="Insert into Email"
                     size="sm"

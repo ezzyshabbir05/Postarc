@@ -9,7 +9,7 @@ import { IconButton } from "@astryxdesign/core/IconButton"
 import { TextInput } from "@astryxdesign/core/TextInput"
 import { Badge } from "@astryxdesign/core/Badge"
 import { Table, type TableColumn, pixel, proportional } from "@astryxdesign/core/Table"
-import { Dialog } from "@astryxdesign/core/Dialog"
+import { Dialog, DialogHeader } from "@astryxdesign/core/Dialog"
 import { Avatar } from "@astryxdesign/core/Avatar"
 import {
   UserPlus,
@@ -113,12 +113,12 @@ export default function ContactsAddressBookPage() {
       width: pixel(260),
       renderCell: (item) => (
         <HStack gap={3} vAlign="center">
-          <Avatar name={item.name} size="md" />
+          <Avatar name={item.name} size={36} />
           <VStack gap={0}>
             <Text type="body" weight="medium">
               {item.name}
             </Text>
-            <Text type="supporting" color="secondary" size="xs">
+            <Text type="supporting" color="secondary" size="xsm">
               {item.email}
             </Text>
           </VStack>
@@ -134,7 +134,7 @@ export default function ContactsAddressBookPage() {
           <Text type="body" size="sm">
             {item.company || "—"}
           </Text>
-          <Text type="supporting" color="secondary" size="xs">
+          <Text type="supporting" color="secondary" size="xsm">
             {item.jobTitle || ""}
           </Text>
         </VStack>
@@ -156,11 +156,9 @@ export default function ContactsAddressBookPage() {
       width: pixel(130),
       renderCell: (item) => (
         <Badge
-          variant="outline"
-          count={0}
-        >
-          {item.group}
-        </Badge>
+          variant="neutral"
+          label={item.group}
+        />
       ),
     },
     {
@@ -169,7 +167,7 @@ export default function ContactsAddressBookPage() {
       width: pixel(120),
       align: "end",
       renderCell: (item) => (
-        <HStack gap={1} justify="flex-end" vAlign="center">
+        <HStack gap={1} hAlign="end" vAlign="center">
           <IconButton
             label="Send Email"
             tooltip="Send Email"
@@ -204,7 +202,7 @@ export default function ContactsAddressBookPage() {
   return (
     <VStack gap={6} padding={6} width="100%">
       {/* Header */}
-      <HStack justify="space-between" vAlign="center" width="100%">
+      <HStack hAlign="between" vAlign="center" width="100%">
         <VStack gap={1}>
           <Heading level={2}>Address Book</Heading>
           <Text type="body" color="secondary">
@@ -221,7 +219,7 @@ export default function ContactsAddressBookPage() {
 
       {/* Filter and Group Bar */}
       <Card padding={4} width="100%">
-        <HStack justify="space-between" vAlign="center" width="100%" wrap>
+        <HStack hAlign="between" vAlign="center" width="100%" wrap="wrap">
           {/* Group Pills */}
           <HStack gap={2} vAlign="center">
             {groups.map((grp) => (
@@ -241,7 +239,7 @@ export default function ContactsAddressBookPage() {
             isLabelHidden
             placeholder="Search by name, email, or company..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(val) => setSearchQuery(val)}
             startIcon={<Search size={16} />}
             width={320}
           />
@@ -249,63 +247,69 @@ export default function ContactsAddressBookPage() {
       </Card>
 
       {/* Contacts Table */}
-      <Card padding={0} width="100%">
-        <Table
-          columns={columns}
-          data={filteredContacts}
-          emptyContent={
-            <VStack gap={2} padding={8} hAlign="center">
-              <Users size={32} className="text-neutral-400" />
-              <Text type="body" color="secondary">
-                No contacts found matching your criteria.
-              </Text>
-            </VStack>
-          }
-        />
-      </Card>
+      {filteredContacts.length === 0 ? (
+        <Card padding={0} width="100%">
+          <VStack gap={2} padding={8} hAlign="center">
+            <Users size={32} className="text-neutral-400" />
+            <Text type="body" color="secondary">
+              No contacts found matching your criteria.
+            </Text>
+          </VStack>
+        </Card>
+      ) : (
+        <Card padding={0} width="100%">
+          <Table
+            columns={columns}
+            data={filteredContacts}
+          />
+        </Card>
+      )}
 
       {/* Add Contact Modal Dialog */}
       <Dialog
         isOpen={isAddOpen}
-        onClose={() => setIsAddOpen(false)}
-        size="md"
-        title="Add New Contact"
+        onOpenChange={setIsAddOpen}
+        width={480}
       >
-        <VStack gap={4} hAlign="stretch">
+        <VStack gap={4} hAlign="stretch" padding={4}>
+          <DialogHeader
+            title="Add New Contact"
+            onOpenChange={setIsAddOpen}
+          />
           <TextInput
             label="Full Name"
             placeholder="e.g. Jane Doe"
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(val) => setName(val)}
           />
           <TextInput
             label="Email Address"
             placeholder="jane.doe@example.com"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(val) => setEmail(val)}
           />
           <TextInput
             label="Phone Number"
             placeholder="+1 (555) 000-0000"
             value={phone}
-            onChange={(e) => setPhone(e.target.value)}
+            onChange={(val) => setPhone(val)}
           />
           <HStack gap={3}>
             <TextInput
               label="Company"
               placeholder="e.g. Acme Corp"
               value={company}
-              onChange={(e) => setCompany(e.target.value)}
+              onChange={(val) => setCompany(val)}
             />
             <TextInput
               label="Job Title"
               placeholder="e.g. VP Engineering"
               value={jobTitle}
-              onChange={(e) => setJobTitle(e.target.value)}
+              onChange={(val) => setJobTitle(val)}
             />
           </HStack>
 
-          <HStack justify="flex-end" gap={2}>
+          <HStack hAlign="end" gap={2}>
             <Button
               variant="ghost"
               size="sm"
@@ -316,7 +320,7 @@ export default function ContactsAddressBookPage() {
               variant="primary"
               size="sm"
               label="Save Contact"
-              disabled={!name.trim() || !email.trim()}
+              isDisabled={!name.trim() || !email.trim()}
               onClick={handleAddContact}
             />
           </HStack>

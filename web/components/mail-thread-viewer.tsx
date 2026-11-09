@@ -399,13 +399,13 @@ export function MailThreadViewer() {
       {!allowedRemoteImages.has(activeEmail.id) && (
         <HStack paddingInline={4} paddingBlock={1} width="100%">
           <Card padding={2} elevation="low" width="100%">
-            <HStack justify="space-between" vAlign="center">
+            <HStack hAlign="between" vAlign="center">
               <Text type="body" size="sm" color="secondary">
                 🛡️ Remote tracker images have been blocked to protect your privacy.
               </Text>
               <Button
-                variant="outline"
-                size="xs"
+                variant="secondary"
+                size="sm"
                 label="Load Images"
                 onClick={() => allowRemoteImagesForEmail(activeEmail.id)}
               />

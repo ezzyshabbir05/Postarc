@@ -317,7 +317,8 @@ export default function MailboxSettingsPage() {
               <HStack gap={4} width="100%">
                 <TextInput
                   label="Start Date"
-                  type="date"
+                  type="text"
+                  placeholder="YYYY-MM-DD"
                   value={vacationFromDate}
                   onChange={(val) => {
                     setVacationFromDate(val)
@@ -327,7 +328,8 @@ export default function MailboxSettingsPage() {
                 />
                 <TextInput
                   label="End Date"
-                  type="date"
+                  type="text"
+                  placeholder="YYYY-MM-DD"
                   value={vacationToDate}
                   onChange={(val) => {
                     setVacationToDate(val)

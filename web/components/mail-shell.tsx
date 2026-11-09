@@ -14,7 +14,7 @@ import { ProgressBar } from "@astryxdesign/core/ProgressBar"
 import { VStack, HStack } from "@astryxdesign/core/Layout"
 import { Text } from "@astryxdesign/core/Text"
 import { Banner } from "@astryxdesign/core/Banner"
-import { Dialog } from "@astryxdesign/core/Dialog"
+import { Dialog, DialogHeader } from "@astryxdesign/core/Dialog"
 import {
   Search,
   Inbox,
@@ -131,7 +131,7 @@ function MailTopNav({ user }: MailTopNavProps) {
                     { label: "Company Admin Console", href: "/admin" },
                   ]
                 : []),
-              { type: "divider" },
+              { type: "divider" as const },
               { label: "Sign out", href: "/", variant: "destructive" },
             ]}
           />
@@ -352,10 +352,10 @@ function MailSideNav({ user }: MailSideNavProps) {
       {/* ── Custom Folders (Roundcube Suite) ── */}
       <SideNavSection
         title="Folders"
-        action={
+        endContent={
           <Button
             variant="ghost"
-            size="xs"
+            size="sm"
             icon={<Plus size={14} />}
             label="New"
             onClick={() => setIsNewFolderOpen(true)}
@@ -382,18 +382,21 @@ function MailSideNav({ user }: MailSideNavProps) {
       {/* Create Folder Dialog */}
       <Dialog
         isOpen={isNewFolderOpen}
-        onClose={() => setIsNewFolderOpen(false)}
-        size="sm"
-        title="Create New Mailbox Folder"
+        onOpenChange={setIsNewFolderOpen}
+        width={420}
       >
-        <VStack gap={4} hAlign="stretch">
+        <VStack gap={4} hAlign="stretch" padding={4}>
+          <DialogHeader
+            title="Create New Mailbox Folder"
+            onOpenChange={setIsNewFolderOpen}
+          />
           <TextInput
             label="Folder Name"
             placeholder="e.g. Invoices, Projects, Archive 2026"
             value={newFolderName}
-            onChange={(e) => setNewFolderName(e.target.value)}
+            onChange={(val) => setNewFolderName(val)}
           />
-          <HStack justify="flex-end" gap={2}>
+          <HStack hAlign="end" gap={2}>
             <Button
               variant="ghost"
               size="sm"
@@ -404,7 +407,7 @@ function MailSideNav({ user }: MailSideNavProps) {
               variant="primary"
               size="sm"
               label="Create Folder"
-              disabled={!newFolderName.trim()}
+              isDisabled={!newFolderName.trim()}
               onClick={handleCreateFolder}
             />
           </HStack>
