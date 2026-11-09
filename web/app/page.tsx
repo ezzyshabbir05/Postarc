@@ -50,12 +50,11 @@ export default function LoginPage() {
         return
       }
 
-      const user = username.toLowerCase().trim()
-      // RBAC role-based routing
-      if (user.startsWith("admin") || user.includes("owner")) {
-        router.push("/admin")
+      const role = res.user?.role || (username.toLowerCase().startsWith("admin") ? "admin" : "member")
+      if (role === "admin") {
+        window.location.href = "/admin"
       } else {
-        router.push("/mail")
+        window.location.href = "/mail"
       }
     } catch {
       setErrorMessage("Unable to connect to authentication server.")
@@ -64,11 +63,6 @@ export default function LoginPage() {
     }
   }
 
-  const fillDemoUser = (user: string, pass: string) => {
-    setUsername(user)
-    setPassword(pass)
-    setErrorMessage("")
-  }
 
   return (
     <Center
@@ -161,6 +155,12 @@ export default function LoginPage() {
               isLoading={isLoading}
               onClick={handleSubmit}
             />
+
+            <HStack hAlign="center" width="100%" paddingBlockStart={1}>
+              <Link href="/onboarding" size="sm" color="secondary">
+                First time setup? Run Onboarding Wizard →
+              </Link>
+            </HStack>
           </VStack>
         </Card>
       </VStack>

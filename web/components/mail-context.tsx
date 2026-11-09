@@ -108,10 +108,11 @@ export function MailProvider({ children }: { children: React.ReactNode }) {
   const [searchQuery, setSearchQuery] = useState("")
 
   // Roundcube Real State (Zero Mock)
+  const currentUser = typeof window !== "undefined" ? postarcApi.getCurrentUser() : null
   const defaultIdentity: PostarcIdentity = {
     id: "id_default",
-    name: "Mailbox Owner",
-    email: "user@postarc.local",
+    name: currentUser?.fullName || "Mailbox Owner",
+    email: currentUser?.email || "",
     isDefault: true,
   }
   const [identities, setIdentities] = useState<PostarcIdentity[]>([defaultIdentity])
@@ -465,7 +466,7 @@ export function MailProvider({ children }: { children: React.ReactNode }) {
     const toMatch = text.match(/^To:\s*(.*)$/im)
     const subject = subjectMatch ? subjectMatch[1].trim() : file.name.replace(/\.eml$/i, "")
     const from = fromMatch ? fromMatch[1].trim() : "Imported Message"
-    const to = toMatch ? toMatch[1].trim() : "me@postarc.local"
+    const to = toMatch ? toMatch[1].trim() : (currentUser?.email || "me@localhost")
 
     const bodyParts = text.split(/\r?\n\r?\n/)
     const body = bodyParts.slice(1).join("\n\n") || "Imported email content."

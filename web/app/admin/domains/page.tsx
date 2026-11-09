@@ -56,7 +56,7 @@ export default function AdminDomainsPage() {
   }, [])
 
   const activeDomain = domains.find((d) => d.id === activeDomainId) || domains[0] || {
-    id: "dom_placeholder",
+    id: "dom_primary",
     name: "example.com",
     isPrimary: true,
     isVerified: true,
@@ -115,7 +115,7 @@ export default function AdminDomainsPage() {
         dkimStatus: "unconfigured",
         dmarcStatus: "unconfigured",
         catchAllEnabled: false,
-        catchAllTargetEmail: "admin@postarc.local",
+        catchAllTargetEmail: `admin@${newDomainName.trim()}`,
         createdAt: new Date().toISOString(),
       }
 

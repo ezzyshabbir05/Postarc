@@ -19,12 +19,24 @@ const nextConfig: NextConfig = {
         destination: `${engineUrl}/api/auth`,
       },
       {
+        source: "/jmap",
+        destination: `${engineUrl}/jmap`,
+      },
+      {
         source: "/jmap/:path*",
         destination: `${engineUrl}/jmap/:path*`,
       },
       {
+        source: "/.well-known/jmap",
+        destination: `${engineUrl}/.well-known/jmap`,
+      },
+      {
         source: "/auth/:path*",
         destination: `${engineUrl}/auth/:path*`,
+      },
+      {
+        source: "/dav/:path*",
+        destination: `${engineUrl}/dav/:path*`,
       },
     ];
   },

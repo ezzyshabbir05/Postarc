@@ -44,8 +44,8 @@ function AdminTopNav({ admin: initialAdmin }: AdminTopNavProps) {
     }
   }, [adminUser])
 
-  const fullName = adminUser?.fullName || "Postarc Administrator"
-  const email = adminUser?.email || "admin@postarc.local"
+  const fullName = adminUser?.fullName || "Administrator"
+  const email = adminUser?.email || ""
 
   return (
     <TopNav

@@ -8,7 +8,9 @@ import {
   proportional,
 } from "@astryxdesign/core/Table"
 import { HStack, VStack } from "@astryxdesign/core/Layout"
-import { Text } from "@astryxdesign/core/Text"
+import { Text, Heading } from "@astryxdesign/core/Text"
+import { Center } from "@astryxdesign/core/Center"
+import { Button } from "@astryxdesign/core/Button"
 import { IconButton } from "@astryxdesign/core/IconButton"
 import { CheckboxInput } from "@astryxdesign/core/CheckboxInput"
 import { DropdownMenu } from "@astryxdesign/core/DropdownMenu"
@@ -20,6 +22,8 @@ import {
   MailOpen,
   Mail,
   Clock,
+  Inbox,
+  SquarePen,
 } from "lucide-react"
 import { useMail } from "@/components/mail-context"
 import type { EmailThread } from "@/types/email"
@@ -38,6 +42,7 @@ export function MailList() {
     deleteSelected,
     toggleEmailRead,
     snoozeEmails,
+    openCompose,
   } = useMail()
 
   const [hoveredId, setHoveredId] = useState<string | null>(null)
@@ -301,6 +306,31 @@ export function MailList() {
       },
     },
   ]
+
+  if (filteredEmails.length === 0) {
+    return (
+      <Center axis="both" minHeight={400} width="100%" padding={8}>
+        <VStack gap={3} hAlign="center" style={{ maxWidth: 360, textAlign: "center" }}>
+          <Inbox size={48} className="text-neutral-400" />
+          <Heading level={3}>No messages found</Heading>
+          <Text type="body" color="secondary" size="sm">
+            {searchQuery
+              ? `No emails matched your search "${searchQuery}".`
+              : activeFolder === "inbox"
+              ? "Your inbox is clean and up to date."
+              : `There are no emails in ${activeFolder}.`}
+          </Text>
+          <Button
+            label="Compose Email"
+            variant="primary"
+            size="md"
+            icon={<SquarePen size={16} />}
+            onClick={openCompose}
+          />
+        </VStack>
+      </Center>
+    )
+  }
 
   return (
     <Table

@@ -30,7 +30,7 @@ interface AppPasswordRow extends AppPassword, Record<string, unknown> {}
 
 export default function MailboxSettingsPage() {
   const [appPasswords, setAppPasswords] = useState<AppPasswordRow[]>([])
-  const [currentUserEmail, setCurrentUserEmail] = useState("user@postarc.local")
+  const [currentUserEmail, setCurrentUserEmail] = useState("")
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [newAppName, setNewAppName] = useState("")
   const [generatedPassword, setGeneratedPassword] = useState<string | null>(null)

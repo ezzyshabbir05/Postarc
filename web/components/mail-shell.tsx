@@ -57,8 +57,8 @@ function MailTopNav({ user: initialUser }: MailTopNavProps) {
     }
   })
 
-  const displayName = user?.fullName || "Postarc User"
-  const email = user?.email || "user@postarc.local"
+  const displayName = user?.fullName || "My Account"
+  const email = user?.email || ""
   const isAdmin = user?.role === "admin"
 
   return (
@@ -144,7 +144,7 @@ function MailTopNav({ user: initialUser }: MailTopNavProps) {
               ...(isAdmin
                 ? [
                     { type: "divider" as const },
-                    { label: "Company Admin Console", href: "/admin" },
+                    { label: "Admin Console", href: "/admin" },
                   ]
                 : []),
               { type: "divider" as const },

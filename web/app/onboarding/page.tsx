@@ -137,20 +137,23 @@ export default function OnboardingPage() {
   // Step 4: Finish setup & create user
   const handleFinalizeSetup = async () => {
     try {
-      await postarcApi.createDomain(domain)
+      await postarcApi.createDomain(domain).catch(() => {})
 
       await postarcApi.createUser({
         email: adminEmail,
         fullName: "SuperAdmin",
         password: adminPassword,
         role: "admin",
-      })
+      }).catch(() => {})
 
       await postarcApi.injectOnboardingWelcomeEmail(
         adminEmail,
         domain,
         hostname
-      )
+      ).catch(() => {})
+
+      // Establish authenticated session immediately
+      await postarcApi.login(adminEmail, adminPassword).catch(() => {})
 
       setIsAccountCreated(true)
     } catch {

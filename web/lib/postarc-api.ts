@@ -214,9 +214,29 @@ class PostarcClient {
   // ---------------------------------------------------------------------------
   // Authentication & Session (RFC 8620 Basic Auth & OAuth2)
   // ---------------------------------------------------------------------------
-  async login(accountName: string, accountSecret: string): Promise<{ success: boolean; token?: string; error?: string }> {
+  async login(
+    accountName: string,
+    accountSecret: string
+  ): Promise<{ success: boolean; token?: string; error?: string; user?: any }> {
     try {
-      // 1. First attempt RFC 8620 HTTP Basic Auth against JMAP /api/account
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: accountName,
+          password: accountSecret,
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok || !data.success) {
+        return {
+          success: false,
+          error: data.error || "Invalid username or password.",
+        };
+      }
+
       const plain = `${accountName}:${accountSecret}`;
       const basicToken =
         typeof window !== "undefined"
@@ -224,92 +244,18 @@ class PostarcClient {
           : Buffer.from(plain).toString("base64");
       const fullBasicAuth = `Basic ${basicToken}`;
 
-      const jmapRes = await fetch(`${this.baseUrl}/jmap/`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: fullBasicAuth,
-        },
-        body: JSON.stringify({
-          using: ["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
-          methodCalls: [["Mailbox/get", { accountId: "self", ids: [] }, "0"]],
-        }),
-      });
-
-      if (jmapRes.ok) {
-        this.setToken(fullBasicAuth);
-        if (typeof window !== "undefined") {
-          localStorage.setItem("postarc_account", accountName);
-        }
-        return { success: true, token: fullBasicAuth };
+      this.setToken(fullBasicAuth);
+      if (typeof window !== "undefined") {
+        localStorage.setItem("postarc_account", data.user.email);
+        localStorage.setItem("postarc_user_name", data.user.fullName);
+        localStorage.setItem("postarc_user_role", data.user.role);
       }
 
-      if (jmapRes.status === 401 || jmapRes.status === 403) {
-        return { success: false, error: "Invalid username or password." };
-      }
-
-      // 2. If Basic Auth did not succeed, attempt OAuth authorization endpoint
-      const res = await fetch(`${this.baseUrl}/api/auth`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type: "authCode",
-          accountName,
-          accountSecret,
-          query: "response_type=code&client_id=postarc-web&scope=urn:ietf:params:jmap:core",
-        }),
-      });
-
-      if (!res.ok) {
-        const errData = await res.json().catch(() => null);
-        return {
-          success: false,
-          error:
-            errData?.description ||
-            errData?.message ||
-            "Invalid account credentials or unauthorized.",
-        };
-      }
-
-      const data = await res.json();
-      if (data.type === "authenticated" && data.location) {
-        const url = new URL(
-          data.location,
-          typeof window !== "undefined" ? window.location.origin : "http://localhost:3000"
-        );
-        const code = url.searchParams.get("code");
-        if (code) {
-          const tokenRes = await fetch(`${this.baseUrl}/auth/token`, {
-            method: "POST",
-            headers: { "Content-Type": "application/x-www-form-urlencoded" },
-            body: new URLSearchParams({
-              grant_type: "authorization_code",
-              code,
-              client_id: "postarc-web",
-            }),
-          });
-          if (tokenRes.ok) {
-            const tokenData = await tokenRes.json();
-            const bearerToken = `Bearer ${tokenData.access_token}`;
-            this.setToken(bearerToken);
-            if (typeof window !== "undefined") {
-              localStorage.setItem("postarc_account", accountName);
-            }
-            return { success: true, token: bearerToken };
-          }
-        }
-      }
-
-      return {
-        success: false,
-        error: "Failed to establish authenticated session with Postarc Engine.",
-      };
+      return { success: true, token: fullBasicAuth, user: data.user };
     } catch (err: any) {
       return {
         success: false,
-        error:
-          err.message ||
-          `Unable to reach Postarc Engine at ${this.baseUrl || "localhost:8080"}.`,
+        error: err.message || "Unable to connect to authentication server.",
       };
     }
   }
@@ -317,15 +263,23 @@ class PostarcClient {
   getCurrentUser(): MailboxUser | null {
     if (typeof window === "undefined") return null;
     const token = this.getToken();
-    if (!token) return null;
-    const account = localStorage.getItem("postarc_account") || "admin@postarc.local";
-    const name = account.split("@")[0] || "User";
-    const role = account.toLowerCase().startsWith("admin") ? "admin" : "member";
+    const account = localStorage.getItem("postarc_account");
+    if (!token && !account) return null;
+
+    const email = account || "";
+    if (!email) return null;
+
+    const storedName = localStorage.getItem("postarc_user_name");
+    const storedRole = localStorage.getItem("postarc_user_role");
+    const namePart = email.split("@")[0] || "User";
+    const fullName = storedName || (namePart.charAt(0).toUpperCase() + namePart.slice(1));
+    const role = (storedRole as "admin" | "member") || (email.toLowerCase().startsWith("admin") ? "admin" : "member");
+
     return {
-      id: account,
-      email: account,
-      fullName: name.charAt(0).toUpperCase() + name.slice(1),
-      role: role as "admin" | "member",
+      id: email,
+      email,
+      fullName,
+      role,
       storageUsedBytes: 0,
       storageTotalBytes: 15 * 1024 * 1024 * 1024,
       storagePercent: 0,
@@ -337,11 +291,15 @@ class PostarcClient {
     };
   }
 
-  logout() {
+  async logout() {
     this.token = null;
     if (typeof window !== "undefined") {
       localStorage.removeItem("postarc_jwt");
       localStorage.removeItem("postarc_account");
+      localStorage.removeItem("postarc_user_name");
+      localStorage.removeItem("postarc_user_role");
+      await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
+      window.location.href = "/";
     }
   }
 
@@ -481,9 +439,9 @@ class PostarcClient {
     const emailList = data.methodResponses?.[1]?.[1]?.list || [];
     return emailList.map((item: any) => ({
       id: item.id,
-      senderName: item.from?.[0]?.name || item.from?.[0]?.email || "Unknown",
-      senderEmail: item.from?.[0]?.email || "unknown@postarc.local",
-      recipientEmail: item.to?.[0]?.email || "me@postarc.local",
+      senderName: item.from?.[0]?.name || item.from?.[0]?.email || "Unknown Sender",
+      senderEmail: item.from?.[0]?.email || "",
+      recipientEmail: item.to?.[0]?.email || (this.getCurrentUser()?.email || ""),
       subject: item.subject || "(No Subject)",
       snippet: item.preview || "",
       body: item.textBody || "",
@@ -851,7 +809,7 @@ class PostarcClient {
       const dtStart = ev.start.replace(/[-:]/g, "").split(".")[0] + "Z";
       const dtEnd = ev.end.replace(/[-:]/g, "").split(".")[0] + "Z";
       lines.push("BEGIN:VEVENT");
-      lines.push(`UID:${ev.id}@postarc.local`);
+      lines.push(`UID:${ev.id}@${this.getCurrentUser()?.email.split("@")[1] || "calendar.local"}`);
       lines.push(`DTSTAMP:${dtStart}`);
       lines.push(`DTSTART:${dtStart}`);
       lines.push(`DTEND:${dtEnd}`);
@@ -1095,7 +1053,7 @@ class PostarcClient {
     return list.map((u: any) => ({
       id: u.id,
       tenantId: "tenant_primary",
-      email: u.email || `${u.name}@postarc.local`,
+      email: u.email || `${u.name}@${u.domain || "example.com"}`,
       fullName: u.fullName || u.name,
       role: (u.roles?.[0] as any) || "member",
       status: u.status || "active",

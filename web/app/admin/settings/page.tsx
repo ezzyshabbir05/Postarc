@@ -12,8 +12,8 @@ import { postarcApi } from "@/lib/postarc-api"
 import { AdminPageLayout } from "@/components/admin-page-layout"
 
 export default function AdminSettingsPage() {
-  const [orgName, setOrgName] = useState("Postarc Organization")
-  const [primaryDomain, setPrimaryDomain] = useState("postarc.local")
+  const [orgName, setOrgName] = useState("Mail Organization")
+  const [primaryDomain, setPrimaryDomain] = useState("example.com")
   const [defaultQuota, setDefaultQuota] = useState("15")
   const [disclaimer, setDisclaimer] = useState("")
   const [isSaved, setIsSaved] = useState(false)

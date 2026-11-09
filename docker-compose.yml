@@ -30,10 +30,13 @@ services:
       retries: 5
 
   engine:
-    build:
-      context: ./engine
-      dockerfile: Dockerfile
+    # build:
+    #   context: ./engine
+    #   dockerfile: Dockerfile
+    # container_name: postarc-engine
+    image: stalwartlabs/mail-server:v0.11.8
     container_name: postarc-engine
+    command: ["--config", "/etc/postarc/postarc.toml"]
     restart: unless-stopped
     depends_on:
       db:
