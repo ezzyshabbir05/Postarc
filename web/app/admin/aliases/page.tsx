@@ -21,11 +21,11 @@ export default function AdminAliasesPage() {
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
 
-  const [domains, setDomains] = useState<string[]>(["postarc.com"])
-  const [selectedDomain, setSelectedDomain] = useState("postarc.com")
+  const [domains, setDomains] = useState<string[]>(["example.com"])
+  const [selectedDomain, setSelectedDomain] = useState("example.com")
   const [aliasHandle, setAliasHandle] = useState("")
   const [displayName, setDisplayName] = useState("")
-  const [targetEmails, setTargetEmails] = useState("admin@postarc.local")
+  const [targetEmails, setTargetEmails] = useState("admin@example.com")
   const [isGroup, setIsGroup] = useState(false)
   const [sendAsAllowed, setSendAsAllowed] = useState(true)
 

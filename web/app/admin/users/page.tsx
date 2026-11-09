@@ -22,7 +22,7 @@ interface UserRow extends MailboxUser, Record<string, unknown> {}
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<UserRow[]>([])
-  const [domains, setDomains] = useState<string[]>(["postarc.com"])
+  const [domains, setDomains] = useState<string[]>(["example.com"])
   const [searchQuery, setSearchQuery] = useState("")
 
   useEffect(() => {
@@ -49,7 +49,7 @@ export default function AdminUsersPage() {
   const [newFullName, setNewFullName] = useState("")
   const [newUsername, setNewUsername] = useState("")
   const [newPassword, setNewPassword] = useState("TempPass#2026!")
-  const [newDomain, setNewDomain] = useState("postarc.com")
+  const [newDomain, setNewDomain] = useState("example.com")
   const [newQuotaGB, setNewQuotaGB] = useState(15)
   const [newMustChangePassword, setNewMustChangePassword] = useState(true)
   const [newAllowImapSmtp, setNewAllowImapSmtp] = useState(true)

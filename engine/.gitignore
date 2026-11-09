@@ -6,4 +6,6 @@ run.sh
 !.gitignore
 !.gitattributes
 !.github
+!*.dockerignore
+!.dockerignore
 !.cargo

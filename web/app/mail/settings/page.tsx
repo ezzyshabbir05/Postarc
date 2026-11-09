@@ -36,7 +36,9 @@ export default function MailboxSettingsPage() {
   const [generatedPassword, setGeneratedPassword] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
 
-  // Load app passwords, user email, and signature
+  const serverHost = currentUserEmail.includes("@")
+    ? `mail.${currentUserEmail.split("@")[1]}`
+    : (typeof window !== "undefined" ? window.location.hostname : "mail.yourdomain.com")
   useEffect(() => {
     const list = postarcApi.getAppPasswords()
     setAppPasswords(
@@ -252,7 +254,7 @@ export default function MailboxSettingsPage() {
                     Incoming Mail (IMAP)
                   </Text>
                   <Text type="code" size="sm">
-                    imap.postarc.com:993 (SSL/TLS)
+                    {serverHost}:993 (SSL/TLS)
                   </Text>
                 </VStack>
                 <VStack gap={0}>
@@ -260,7 +262,7 @@ export default function MailboxSettingsPage() {
                     Outgoing Mail (SMTP)
                   </Text>
                   <Text type="code" size="sm">
-                    smtp.postarc.com:465 (SSL/TLS)
+                    {serverHost}:465 (SSL/TLS)
                   </Text>
                 </VStack>
                 <VStack gap={0}>

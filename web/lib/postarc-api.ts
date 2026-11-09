@@ -1226,7 +1226,7 @@ class PostarcClient {
     const s = data?.methodResponses?.[0]?.[1]?.list?.[0] || {};
     const defaultDomain: CustomDomain = {
       id: "dom_primary",
-      name: s.primaryDomain || "postarc.com",
+      name: s.primaryDomain || (typeof window !== "undefined" && window.location.hostname !== "localhost" ? window.location.hostname : "example.com"),
       isPrimary: true,
       isVerified: true,
       verificationToken: "postarc-verify=verified",
@@ -1428,8 +1428,8 @@ Security Best Practices:
   2. Use App Passwords for Thunderbird, Outlook, and mobile devices under Settings.
   3. Keep your SuperAdmin credentials secure.
 
-Postarc Team — Enterprise Mail & Collaboration
-https://postarc.com
+Postarc Project — Open Source Mail & Collaboration Platform
+https://${hostname}
 `;
 
       await this.sendEmail({
