@@ -1,0 +1,22 @@
+@import "tailwindcss";
+@import "@astryxdesign/core/reset.css";
+@import "@astryxdesign/core/astryx.css";
+
+/* Reduce border radius in AppShell's elevated top-start corner (default was 28px / 1.75rem) */
+.astryx-app-shell {
+    --radius-page: 1.2rem;
+}
+
+/* Zero-height empty table header in headerless email list: collapses vertical gap while preserving fixed column widths */
+.mail-table-headerless thead tr {
+    height: 0 !important;
+    line-height: 0 !important;
+}
+
+.mail-table-headerless thead th {
+    padding-block: 0 !important;
+    height: 0 !important;
+    border-bottom: none !important;
+    line-height: 0 !important;
+    font-size: 0 !important;
+}

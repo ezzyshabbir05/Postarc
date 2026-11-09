@@ -10,3 +10,4 @@ docker compose up -d
 echo "Postarc stack started!"
 echo "Webmail: http://localhost:3000/mail"
 echo "Admin:   http://localhost:3000/admin"
+

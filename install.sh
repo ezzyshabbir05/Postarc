@@ -104,3 +104,4 @@ echo -e "  TXT:   @              \"v=spf1 mx ~all\""
 echo -e "  TXT:   _dmarc         \"v=DMARC1; p=quarantine; rua=mailto:dmarc@${DOMAIN}\""
 echo ""
 echo "Manage containers with: docker compose [ps|logs|restart|stop]"
+

@@ -19,3 +19,4 @@ if %errorlevel% neq 0 (
     echo Webmail: http://localhost:3000/mail
     echo Admin:   http://localhost:3000/admin
 )
+
